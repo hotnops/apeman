@@ -1,0 +1,7 @@
+go 1.20
+
+use (
+	./cmd
+	./packages/go/analyze
+	./packages/go/graphschema
+)

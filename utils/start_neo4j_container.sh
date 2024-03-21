@@ -1,0 +1,1 @@
+sudo docker run -it --rm --env 'NEO4JLABS_PLUGINS=["apoc"]' --publish=7474:7474 --publish=7687:7687 --volume=/var/lib/neo4j/data:/data --volume=$PWD/import:/import --env=NEO4J_AUTH=none -e NEO4J_dbms_memory_heap_initial__size=6G -e NEO4J_dbms_memory_heap_max__size=16G -e NEO4J_dbms_memory_pagecache_size=4G neo4j
