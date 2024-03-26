@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import apiClient from "../services/api-client";
-import { CanceledError } from "axios";
 
 export interface Permission {
   arn: string;
@@ -32,35 +31,34 @@ export const useGetNodes = (
   const nodes: Node[] = [];
 
   useEffect(() => {
-    apiClient.get<NodeResponse[]>(endpoint).then((res) => {
-      res.data.map((node: NodeResponse) => {
-        nodes.push({
-          id: node.id.toString(),
-          label: node.properties.map.account_id,
+    apiClient
+      .get<NodeResponse[]>(endpoint)
+      .then((res) => {
+        res.data.map((node: NodeResponse) => {
+          nodes.push({
+            id: node.id.toString(),
+            label: node.properties.map.account_id,
+          });
         });
+        console.log("Setting nodes");
+        setNodes(nodes);
+      })
+      .catch(() => {
+        setNodes([]);
+      })
+      .finally(() => {
+        console.log("Finished loading");
+        setLoading(false);
       });
-      console.log("Setting nodes")
-      setNodes(nodes);
-    })
-    .catch(() => {
-      setNodes([])
-    })
-    .finally(() => {
-      console.log("Finished loading")
-      setLoading(false)
-    })
   }, []);
 };
 
-const usePermissions = (
-  endpoint: string,
-  refreshCount: number
-) => {
+const usePermissions = (endpoint: string, refreshCount: number) => {
   const [error, setError] = useState("");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isLoading, setLoading] = useState(false);
 
-  const controller = new AbortController()
+  const controller = new AbortController();
 
   useEffect(() => {
     console.log("UseEffect");
@@ -77,7 +75,9 @@ const usePermissions = (
       .finally(() => {
         setLoading(false);
       });
-    return () => {controller.abort()}
+    return () => {
+      controller.abort();
+    };
   }, [refreshCount]);
 
   return { permissions, error, isLoading, controller };

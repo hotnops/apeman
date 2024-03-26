@@ -1,6 +1,5 @@
-import { useApemanGraph } from "../hooks/useApemanGraph";
 import apiClient from "./api-client";
-import nodeService, { Node } from "./nodeService";
+import { Node } from "./nodeService";
 import { Relationship } from "./relationshipServices";
 
 export interface Path {

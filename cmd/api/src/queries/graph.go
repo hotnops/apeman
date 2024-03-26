@@ -32,6 +32,10 @@ func CypherQuery(ctx context.Context, db graph.Database, cypherQuery string) (gr
 		return nil, err
 	}
 
+	if returnPathSet == nil {
+		returnPathSet = graph.NewPathSet()
+	}
+
 	return returnPathSet, nil
 }
 

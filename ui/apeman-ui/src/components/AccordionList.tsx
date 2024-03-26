@@ -11,12 +11,10 @@ import {
   Text,
   Tr,
 } from "@chakra-ui/react";
-import { Node, getNodeLabel, nodeToGraphNode } from "../services/nodeService";
+import { Node, getNodeLabel } from "../services/nodeService";
 import { PiGraph } from "react-icons/pi";
 import { SlTarget } from "react-icons/sl";
 import { useApemanGraph } from "../hooks/useApemanGraph";
-import { Path } from "../services/pathService";
-import NodeListItem from "./NodeListItem";
 
 interface Props {
   nodes: Node[];
@@ -25,7 +23,7 @@ interface Props {
 }
 
 const AccordionList = ({ nodes, name, pathFunction }: Props) => {
-  const { setNodes, addNode } = useApemanGraph();
+  const { addNode } = useApemanGraph();
   if (nodes === null) {
     return <></>;
   }
@@ -41,7 +39,6 @@ const AccordionList = ({ nodes, name, pathFunction }: Props) => {
         </AccordionButton>
         <Button
           onClick={() => {
-            //setNodes([]);
             nodes.map((node) => {
               if (pathFunction) {
                 pathFunction(node);

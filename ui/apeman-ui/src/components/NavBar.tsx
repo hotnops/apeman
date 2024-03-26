@@ -1,13 +1,10 @@
-import { Box, Card, HStack, Input, useTheme } from "@chakra-ui/react";
+import { Box, Card, HStack, useTheme } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
 import { useEffect, useRef, useState } from "react";
-import apiClient from "../services/api-client";
 import { Node } from "../services/nodeService";
 import NodeSuggestions from "./NodeSuggestions";
 import { RiDirectionLine } from "react-icons/ri";
-import { IoIosCloseCircleOutline } from "react-icons/io";
 import HoverIcon from "./HoverIcon";
-import Pathfinder from "./Pathfinder";
 import SearchBar from "./SearchBar";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 
@@ -18,14 +15,16 @@ interface Props {
 const NavBar = ({ closeNavBar }: Props) => {
   const [searchResults, setSearchResults] = useState<Node[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const wrapperRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
   const [search, setSearch] = useState("");
   const handleFocusChange = (event: any) => {
-    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-      setShowSuggestions(false);
-    } else {
-      setShowSuggestions(true);
+    if (wrapperRef.current != null) {
+      if (!wrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      } else {
+        setShowSuggestions(true);
+      }
     }
   };
   useEffect(() => {

@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import apiClient from "../services/api-client";
-import { Box, HStack, Input, useTheme } from "@chakra-ui/react";
-import { SearchIcon } from "@chakra-ui/icons";
-import HoverIcon from "./HoverIcon";
-import { RiDirectionLine } from "react-icons/ri";
+import { Input } from "@chakra-ui/react";
 import { Node } from "../services/nodeService";
 
 interface Props {
@@ -21,7 +18,6 @@ const SearchBar = ({
   setSearchResults,
   variant = "unstyled",
   placeholder = "",
-  kinds = [],
 }: Props) => {
   const handleChange = (e: any) => {
     setSearch(e.target.value);

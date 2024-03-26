@@ -7,7 +7,6 @@ import ResourceOverview from "./ResourceOverview";
 import NodeOverview from "./NodeOverview";
 import StatementOverview from "./StatementOverview";
 import { kinds } from "../services/nodeService";
-import TagPanel from "./TagPanel";
 
 interface Props {
   node: Node;

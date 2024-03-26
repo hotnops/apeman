@@ -9,7 +9,7 @@ import {
   Thead,
   Tr,
 } from "@chakra-ui/react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getActiveConditionKeys } from "../services/conditionService";
 import { Node } from "../services/nodeService";
 

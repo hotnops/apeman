@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Node } from "../services/nodeService";
 import { useTheme } from "@emotion/react";
 import { useApemanGraph } from "../hooks/useApemanGraph";
@@ -13,7 +13,7 @@ import NodeSuggestions from "./NodeSuggestions";
 
 interface Props {
   nodes: Node[];
-  setPathNodes: (n: Node[]) => void;
+  setPathNodes: (updateFn: (prevNodes: Node[]) => Node[]) => void;
 }
 
 const IdentityPathFinder = ({ nodes, setPathNodes }: Props) => {
@@ -42,12 +42,12 @@ const IdentityPathFinder = ({ nodes, setPathNodes }: Props) => {
             {nodes.length > 0 && (
               <Box boxSize="25px" flexShrink={0}>
                 <HoverIcon
-                  iconColor={theme.colors.gray[500]}
-                  hoverColor={theme.colors.gray[900]}
+                  iconColor={(theme as any).colors.gray[500]}
+                  hoverColor={(theme as any).colors.gray[900]}
                 >
                   <IoCloseCircleOutline
                     onClick={() => {
-                      setPathNodes([]);
+                      setPathNodes(() => []);
                       setSearchQuery("");
                     }}
                     size="100%"

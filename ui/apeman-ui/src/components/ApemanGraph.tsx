@@ -1,20 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import {
   GraphCanvas,
   GraphCanvasRef,
   InternalGraphEdge,
   InternalGraphNode,
-  LayoutTypes,
-  recommendLayout,
 } from "reagraph";
 import nodeService from "../services/nodeService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
-import { layout } from "@chakra-ui/react";
-import {
-  Relationship,
-  getRelationshipByID,
-} from "../services/relationshipServices";
+import { getRelationshipByID } from "../services/relationshipServices";
 
 const theme = {
   canvas: {
@@ -77,12 +71,6 @@ const theme = {
 const ApemanGraph = () => {
   const graphRef = useRef<GraphCanvasRef | null>(null);
   const { nodes, edges, activeElement, setActiveElement } = useApemanGraph();
-
-  var layout = "treeLr2d";
-
-  useEffect(() => {
-    layout = recommendLayout(nodes, edges);
-  }, [nodes, edges]);
 
   var activeElementId = null;
 

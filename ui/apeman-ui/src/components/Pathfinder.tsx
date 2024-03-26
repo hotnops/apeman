@@ -1,10 +1,7 @@
 import {
-  Box,
   Card,
   HStack,
-  Input,
   useTheme,
-  Text,
   IconButton,
   Tabs,
   TabList,
@@ -12,18 +9,9 @@ import {
   TabPanel,
   TabPanels,
 } from "@chakra-ui/react";
-import NodeSuggestions from "./NodeSuggestions";
-import { Node, getNodeLabel } from "../services/nodeService";
+import { Node } from "../services/nodeService";
 import { useEffect, useRef, useState } from "react";
-import SearchBar from "./SearchBar";
-import { MdTripOrigin } from "react-icons/md";
-import { MdOutlinePinDrop } from "react-icons/md";
 import { IoClose } from "react-icons/io5";
-import HoverIcon from "./HoverIcon";
-import { RiDirectionLine } from "react-icons/ri";
-import { IoMdArrowRoundDown } from "react-icons/io";
-import { IoEllipsisVerticalSharp, IoCloseCircleOutline } from "react-icons/io5";
-import NodeListItem from "./NodeListItem";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import {
   GetNodePermissionPath,
@@ -32,8 +20,6 @@ import {
   GetNodeShortestPath,
   GetNodeIdentityPath,
 } from "../services/pathService";
-import { Relationship } from "../services/relationshipServices";
-import { Icon } from "reagraph";
 import { FaUser } from "react-icons/fa";
 import { MdChecklist } from "react-icons/md";
 import { FaArrowsAltH } from "react-icons/fa";

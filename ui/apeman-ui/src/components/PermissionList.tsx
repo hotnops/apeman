@@ -1,19 +1,10 @@
-import {
-  Accordion,
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { Accordion, HStack, IconButton, Input, Text } from "@chakra-ui/react";
 import { MdFilterAlt } from "react-icons/md";
 import { Permission } from "../hooks/usePermissions";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import PermissionItem from "./PermissionItem";
 import apiClient from "../services/api-client";
 import { IoCloseCircle } from "react-icons/io5";
-import { Icon } from "reagraph";
 
 interface Props {
   children: string;
@@ -21,9 +12,9 @@ interface Props {
 }
 
 const PermissionList = ({ children, endpoint }: Props) => {
-  const [error, setError] = useState<Error | null>(null);
+  const [_, setError] = useState<Error | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [isLoading, setLoading] = useState(false);
+  const [__, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
 

@@ -1,4 +1,3 @@
-import { Card } from "@chakra-ui/react";
 import PermissionList from "./PermissionList";
 import { encode } from "url-safe-base64";
 import { Buffer } from "buffer";

@@ -8,7 +8,6 @@ import {
   addPathToGraph,
   getNodesFromPaths,
 } from "../services/pathService";
-import HoverIcon from "./HoverIcon";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 
 interface Props {

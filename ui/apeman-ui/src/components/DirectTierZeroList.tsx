@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AccordionList from "./AccordionList";
 import nodeService from "../services/nodeService";
 import { Node } from "../services/nodeService";

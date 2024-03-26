@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Card,
   Drawer,
   DrawerBody,
@@ -8,14 +7,12 @@ import {
   DrawerHeader,
   DrawerOverlay,
   HStack,
-  Spinner,
-  Text,
   useDisclosure,
 } from "@chakra-ui/react";
 import NavBar from "./components/NavBar";
 import { useEffect, useState } from "react";
 import ApemanGraph from "./components/ApemanGraph";
-import nodeService, { Node, nodeToGraphNode } from "./services/nodeService";
+import nodeService, { Node } from "./services/nodeService";
 import NodeOverviewPanel from "./components/NodeOverviewPanel";
 import { kinds } from "./services/nodeService";
 import { useApemanGraph } from "./hooks/useApemanGraph";
@@ -65,8 +62,8 @@ function App() {
       <HStack position="fixed" top={5} right={5} zIndex={1}>
         <Box height="2em" width="2em">
           <HoverIcon
-            iconColor={theme.colors.gray[500]}
-            hoverColor={theme.colors.gray[900]}
+            iconColor={(theme as any).colors.gray[500]}
+            hoverColor={(theme as any).colors.gray[900]}
           >
             <IoTrashOutline
               size="100%"
@@ -79,8 +76,8 @@ function App() {
           </HoverIcon>
         </Box>
         <HoverIcon
-          iconColor={theme.colors.gray[500]}
-          hoverColor={theme.colors.gray[900]}
+          iconColor={(theme as any).colors.gray[500]}
+          hoverColor={(theme as any).colors.gray[900]}
         >
           <SettingsIcon boxSize="2em" onClick={onOpen}></SettingsIcon>
         </HoverIcon>

@@ -1,5 +1,4 @@
 import { Box, HStack, Image, Text } from "@chakra-ui/react";
-import React from "react";
 import { Node, getIconURL, getNodeLabel } from "../services/nodeService";
 
 interface Props {

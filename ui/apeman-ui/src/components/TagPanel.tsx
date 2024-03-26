@@ -1,32 +1,7 @@
-import {
-  HStack,
-  Table,
-  TableContainer,
-  Td,
-  Tr,
-  Wrap,
-  WrapItem,
-  useTheme,
-} from "@chakra-ui/react";
-import React, { useEffect, useState } from "react";
-import { Badge } from "@chakra-ui/react";
-import apiClient from "../services/api-client";
+import { Table, TableContainer, Td, Tr } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import nodeService, { Node } from "../services/nodeService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
-
-const getColor = (index: number) => {
-  // I love a rainbow...
-  const colors = [
-    "red",
-    "orange",
-    "yellow",
-    "green",
-    "blue",
-    "indigo",
-    "vioilet",
-  ];
-  return colors[index % colors.length];
-};
 
 const TagPanel = () => {
   const [tagNodes, setTagNodes] = useState<Node[]>([]);
@@ -37,7 +12,7 @@ const TagPanel = () => {
       return;
     }
     const { request, cancel } = nodeService.getNodeTags(
-      activeNode.id.toString()
+      (activeNode as Node).id.toString()
     );
     request.then((res) => {
       const nodes: Node[] = res.data;

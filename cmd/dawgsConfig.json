@@ -1,0 +1,23 @@
+{
+    "version": 1,
+    "bind_addr": "0.0.0.0:8080",
+    "metrics_port": ":2112",
+    "root_url": "http://127.0.0.1:8080/",
+    "work_dir": "/opt/apeman/work",
+    "log_level": "INFO",
+    "log_path": "apeman.log",
+    "features": {
+      "enable_auth": false
+    },
+    "tls": {
+      "cert_file": "",
+      "key_file": ""
+    },
+    "database": {
+      "connection": "user=apeman password=apeman dbname=apeman host=app-db"
+    },
+    "neo4j": {
+      "connection": "neo4j://a:b@neo4j:7687/"
+    }
+  }
+  

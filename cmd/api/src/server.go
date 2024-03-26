@@ -452,7 +452,11 @@ func (s *Server) GetAWSTierZeroNodes(c *gin.Context) {
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
-	c.IndentedJSON(http.StatusOK, paths.AllNodes().Slice())
+	if len(paths) == 0 {
+		c.IndentedJSON(http.StatusOK, []string{})
+	} else {
+		c.IndentedJSON(http.StatusOK, paths.AllNodes().Slice())
+	}
 }
 
 func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
@@ -463,7 +467,11 @@ func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
-	c.IndentedJSON(http.StatusOK, paths)
+	if len(paths) == 0 {
+		c.IndentedJSON(http.StatusOK, []string{})
+	} else {
+		c.IndentedJSON(http.StatusOK, paths)
+	}
 }
 
 func (s *Server) handleRequests() {
@@ -496,14 +504,12 @@ func (s *Server) handleRequests() {
 	router.GET("/relationship/:relationshipid", s.GetAWSRelationshipByGraphID)
 	router.GET("/search", s.Search)
 	router.POST("/query", s.PostQuery)
-	router.Run("localhost:4400")
+	router.Run("0.0.0.0:4400")
 }
 
 func (s *Server) InitializeServer() {
-	configFilePath := "../harness/exampleConfig.json"
+	configFilePath := "dawgsConfig.json"
 	s.ctx = context.Background()
-
-	neo4j.Init()
 
 	bhCfg, err := config.GetConfiguration(configFilePath)
 	if err != nil {
@@ -515,7 +521,7 @@ func (s *Server) InitializeServer() {
 		TraversalMemoryLimit: size.Size(bhCfg.TraversalMemoryLimit) * size.Gibibyte,
 	}
 
-	s.db, err = dawgs.Open("neo4j", s.config)
+	s.db, err = dawgs.Open(neo4j.DriverName, s.config)
 	if err != nil {
 		log.Fatalf("Failed to open graph database")
 	}

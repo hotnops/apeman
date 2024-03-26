@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import NodeSuggestions from "./NodeSuggestions";
 import { Box, HStack, useTheme } from "@chakra-ui/react";
 import { MdOutlinePinDrop, MdTripOrigin } from "react-icons/md";
@@ -12,7 +12,7 @@ import { useApemanGraph } from "../hooks/useApemanGraph";
 
 interface Props {
   nodes: Node[];
-  setPathNodes: (nodes: Node[]) => void;
+  setPathNodes: (updateFn: (prevNodes: Node[]) => Node[]) => void;
 }
 
 const PermissionPathFinder = ({ nodes, setPathNodes }: Props) => {
@@ -46,7 +46,7 @@ const PermissionPathFinder = ({ nodes, setPathNodes }: Props) => {
                 >
                   <IoCloseCircleOutline
                     onClick={() => {
-                      setPathNodes([]);
+                      setPathNodes(() => []);
                       setSearchQuery("");
                     }}
                     size="100%"

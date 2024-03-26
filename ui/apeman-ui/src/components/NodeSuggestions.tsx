@@ -1,15 +1,5 @@
-import React from "react";
 import { Node } from "../services/nodeService";
-import {
-  Card,
-  HStack,
-  List,
-  ListItem,
-  Text,
-  Image,
-  Box,
-  useTheme,
-} from "@chakra-ui/react";
+import { List, ListItem, Text, useTheme } from "@chakra-ui/react";
 import NodeListItem from "./NodeListItem";
 
 interface Props {
@@ -18,26 +8,7 @@ interface Props {
   onItemSelect: (node: Node) => void;
 }
 
-const getSearchTermFromNode = (node: Node, searchQuery: string): string => {
-  if ("arn" in node.properties.map) {
-    const haystack = node.properties.map["arn"];
-    if (haystack.toLowerCase().includes(searchQuery.toLowerCase()))
-      return haystack;
-  }
-  if ("name" in node.properties.map) {
-    const haystack = node.properties.map["name"];
-    if (haystack.toLowerCase().includes(searchQuery.toLowerCase()))
-      return haystack;
-  }
-  if ("hash" in node.properties.map) {
-    const haystack = node.properties.map["hash"].toLowerCase();
-    if (haystack.toLowerCase().includes(searchQuery.toLowerCase()))
-      return haystack;
-  }
-  return "";
-};
-
-const NodeSuggestions = ({ nodes, searchQuery, onItemSelect }: Props) => {
+const NodeSuggestions = ({ nodes, onItemSelect }: Props) => {
   var truncated = false;
   if (nodes.length > 5) {
     truncated = true;

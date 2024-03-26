@@ -3,7 +3,6 @@ import { GraphNode, GraphEdge } from "reagraph";
 import { Node, nodeToGraphNode } from "../services/nodeService";
 import {
   Relationship,
-  relationships,
   relationshipToGraphEdge,
 } from "../services/relationshipServices";
 

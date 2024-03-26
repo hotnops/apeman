@@ -1,0 +1,55 @@
+version: "3"
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - --api.insecure=true
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+    ports:
+      - "80:80" # HTTP
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  neo4j:
+    image: neo4j
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    volumes:
+      - "./graph_data:/data"
+    environment:
+      - NEO4JLABS_PLUGINS=["apoc"]
+      - NEO4J_AUTH=none
+      - NEO4J_server_memory_heap_initial__size=6G
+      - NEO4J_server_memory_heap_max__size=16G
+      - NEO4J_server_memory_pagecache_size=4G
+
+  apeman-frontend:
+    image: node:20-alpine
+    command: sh -c "yarn install && yarn vite"
+    volumes:
+      - ./ui/apeman-ui:/app
+    working_dir: /app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.apeman-frontend.rule=Host(`apeman-frontend.localhost`)
+      - traefik.http.routers.apeman-frontend.service=apeman-frontend
+      - traefik.http.services.apeman-frontend.loadbalancer.server.port=5173
+
+  apeman-backend:
+    build:
+      context: ./cmd
+      dockerfile: Dockerfile_dev
+    image: apeman-backend
+    ports:
+      - "2345:2345"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.apeman-backend.rule=Host(`apeman-backend.localhost`)
+      - traefik.http.routers.apeman-backend.service=apeman-backend
+      - traefik.http.services.apeman-backend.loadbalancer.server.port=4400

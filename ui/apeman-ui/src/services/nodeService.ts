@@ -1,6 +1,5 @@
 import { GraphNode } from "reagraph";
 import apiClient from "./api-client";
-import { useTheme } from "@emotion/react";
 import { Path } from "./pathService";
 
 type PropertyMap = {
@@ -45,7 +44,7 @@ export enum kinds {
 const NODE_BASE = "/node";
 
 export function getIconURL(nodeKinds: string[]): string {
-  const icon_dir = "../../public/";
+  const icon_dir = "./";
   if (nodeKinds.includes(kinds.AWSAccount)) {
     return icon_dir + "account_icon.svg";
   }
