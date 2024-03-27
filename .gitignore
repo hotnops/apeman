@@ -1,1 +1,7 @@
 .vscode
+*.pyc
+utils/awsschema.json
+utils/service_metadata.json
+utils/venv/
+graph_data/
+import/
