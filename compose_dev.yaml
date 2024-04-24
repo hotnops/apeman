@@ -45,7 +45,7 @@ services:
     build:
       context: ./cmd
       dockerfile: Dockerfile_dev
-    image: apeman-backend
+    image: apeman-backend-dev
     ports:
       - "2345:2345"
     labels:
