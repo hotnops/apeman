@@ -29,7 +29,7 @@ func main() {
 	configFilePath := "exampleConfig.json"
 	ctx := context.Background()
 
-	neo4j.Init()
+	//neo4j.Init()
 
 	bhCfg, err := config.GetConfiguration(configFilePath)
 	if err != nil {
@@ -41,7 +41,7 @@ func main() {
 		TraversalMemoryLimit: size.Size(bhCfg.TraversalMemoryLimit) * size.Gibibyte,
 	}
 
-	graphDatabase, err := dawgs.Open("neo4j", dawgsCfg)
+	graphDatabase, err := dawgs.Open(neo4j.DriverName, dawgsCfg)
 	if err != nil {
 		log.Fatalf("Failed to open graph database")
 	}
