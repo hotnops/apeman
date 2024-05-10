@@ -2,6 +2,8 @@
 *.pyc
 utils/awsschema.json
 utils/service_metadata.json
-utils/venv/
+utils/.venv/
+utils/.venv/*
+GAAD
 graph_data/
 import/

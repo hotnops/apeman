@@ -20,6 +20,7 @@ services:
       - "7474:7474"
     volumes:
       - "./graph_data:/data"
+      - "./import:/import"
     environment:
       - NEO4JLABS_PLUGINS=["apoc"]
       - NEO4J_AUTH=none
