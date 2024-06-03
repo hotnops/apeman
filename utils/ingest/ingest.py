@@ -5,6 +5,7 @@ import glob
 import json
 import neo4j
 import os
+import re
 import shutil
 import sys
 import xxhash
@@ -42,7 +43,7 @@ statement_to_resource_rels = {}
 statement_to_resource_blob_rels = {}
 statement_to_allow_action_blob_rels = {}
 statement_to_deny_action_blob_rels = {}
-
+condition_key_to_resource_rels = {}
 
 def get_hash(item_to_hash: dict):
     return xxhash.xxh128_hexdigest(json.dumps(item_to_hash, sort_keys=True))
@@ -123,20 +124,51 @@ def neo4j_escape_regex(unescaped_string: str):
     unescaped_string = unescaped_string.replace("[", "\\[]")
     return unescaped_string
 
+def has_policy_variable(resource: str):
+    if "${" in resource:
+        return True
+    
+def extract_policy_variables(input_string: str):
+    # Define the pattern to match the values between ${ and }
+    pattern = r'\$\{(.*?)\}'
+    
+    # Find all occurrences of the pattern in the input string
+    matches = re.findall(pattern, input_string)
+    
+    return matches
+
+def replace_policy_var_with_wildcard(input_string: str):
+    # Define the pattern to match the segment starting with ${ and ending with }
+    pattern = r'\$\{.*?\}'
+    
+    # Replace the matched pattern with an asterisk
+    result = re.sub(pattern, '*', input_string)
+    
+    return result
 
 def process_resources(statement_hash, resources: list):
     for resource in resources:
         regex = None
         is_root = False
+        policy_var = False        
+
+
         if arn.Arn.is_arn(resource):
             resource_arn = arn.Arn.fromstring(resource)
             if resource_arn.service == "iam" and resource_arn.resource == "root":
                 is_root = True
                 regex = f"arn:aws:iam::{resource_arn.account_id}:(user|group|role)/[^:]+"
+            policy_var = has_policy_variable(resource)
 
-        if "*" in resource or is_root:
+        if "*" in resource or is_root or policy_var:
             if resource not in resource_blob_map:
-                if "*" in resource:
+                if policy_var:
+                    vars = extract_policy_variables(resource)
+                    temp_resource = replace_policy_var_with_wildcard(resource)
+                    regex = neo4j_escape_regex(temp_resource)
+                    for var in vars:
+                        add_to_rels(condition_key_to_resource_rels, var, resource)
+                elif "*" in resource:
                     regex = neo4j_escape_regex(resource)
                 resource_blob_map[resource] = {
                     'name': resource,
@@ -615,19 +647,19 @@ def load_csvs_into_database():
                              "AWSCondition:UniqueHash", "hash")
         ingest_relationships(session, "allow_action_to_statement_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "AllowAction",
+                             "Action",
                              "AWSAction:UniqueName", "name")
         ingest_relationships(session, "deny_action_to_statement_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "DenyAction",
+                             "Action",
                              "AWSAction:UniqueName", "name")
         ingest_relationships(session, "statement_to_allow_action_blob_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "AllowAction",
+                             "Action",
                              "AWSActionBlob:UniqueName", "name")
         ingest_relationships(session, "statement_to_deny_action_blob_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "DenyAction",
+                             "Action",
                              "AWSActionBlob:UniqueName", "name")
         ingest_relationships(session, "statement_to_resource_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
@@ -637,6 +669,11 @@ def load_csvs_into_database():
                              "AWSStatement:UniqueHash", "hash",
                              "OnResource",
                              "AWSResourceBlob:UniqueName", "name")
+        ingest_relationships(session, "condition_key_to_resource_rels.csv",
+                             "AWSConditionKey:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSResourceBlob:UniqueName", "name")
+                             
         try:
             ingest_resources(session, "arns.csv")
         except neo4j.exceptions.ClientError:
@@ -702,6 +739,11 @@ def write_rels_to_csv(outputdir):
         "statement_to_deny_action_blob_rels.csv"
     )
 
+    condition_key_to_resource_rels_filename = os.path.join(
+        outputdir,
+        "condition_key_to_resource_rels.csv"
+    )
+
     write_to_csv(hash_to_hash_filename,
                  rels_to_unique_list(hash_to_hash_rels), fields)
     write_to_csv(hash_to_arn_filename,
@@ -742,6 +784,10 @@ def write_rels_to_csv(outputdir):
                  fields)
     write_to_csv(statement_to_deny_action_blob_rels_filename,
                  rels_to_unique_list(statement_to_deny_action_blob_rels),
+                 fields)
+    
+    write_to_csv(condition_key_to_resource_rels_filename,
+                 rels_to_unique_list(condition_key_to_resource_rels),
                  fields)
 
 

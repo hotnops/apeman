@@ -118,7 +118,7 @@ def get_allow_assume_role_statements(session):
     query = """
         MATCH (prin) <- [:AttachedTo*2..3] - (:AWSPolicyDocument) 
             <- [:AttachedTo] - (s:AWSStatement) 
-            - [:AllowAction|DenyAction|ExpandsTo*1..2] -> (a:AWSAction {name: 'sts:assumerole'})
+            - [:Action|ExpandsTo*1..2] -> (a:AWSAction {name: 'sts:assumerole'})
         WHERE (prin:AWSRole OR prin:AWSUser OR prin:AWSGroup)
 
         WITH prin, s,
@@ -141,7 +141,7 @@ def get_allow_assume_role_statements(session):
     query = """
         MATCH (prin:AWSRole) <- [:AttachedTo] - (:AWSAssumeRolePolicy) 
             <- [:AttachedTo] - (s:AWSStatement) 
-            - [:AllowAction|DenyAction|ExpandsTo*1..2] -> (a:AWSAction {name: 'sts:assumerole'})
+            - [:Action|ExpandsTo*1..2] -> (a:AWSAction {name: 'sts:assumerole'})
 
         WITH prin, s,
             CASE WHEN s.effect = "Allow" THEN s ELSE NULL END as allowStatement,
@@ -207,10 +207,10 @@ def get_tier_zero_roles(session):
     query = (
         'MATCH (r:AWSRole) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
-        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachrolepolicy"}) '
+        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachrolepolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as attachrolestatements, r, statements '
-        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachrolepolicy"}) '
+        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachrolepolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as detachrolestatements, r, attachrolestatements, statements '
         'RETURN DISTINCT r.arn, attachrolestatements, detachrolestatements '
@@ -245,10 +245,10 @@ def get_tier_zero_users(session):
     query = (
         'MATCH (r:AWSUser) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
-        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachuserpolicy"}) '
+        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachuserpolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as attachstatements, r, statements '
-        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachuserpolicy"}) '
+        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachuserpolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as detachstatements, r, attachstatements, statements '
         'RETURN DISTINCT r.arn, attachstatements, detachstatements '
@@ -276,10 +276,10 @@ def get_tier_zero_groups(session):
     query = (
         'MATCH (r:AWSGroup) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
-        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachgrouppolicy"}) '
+        'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachgrouppolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as attachstatements, r, statements '
-        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:AllowAction|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachgrouppolicy"}) '
+        'MATCH p2=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:detachgrouppolicy"}) '
         'WHERE s in statements '
         'WITH COLLECT(s) as detachstatements, r, attachstatements, statements '
         'RETURN DISTINCT r.arn, attachstatements, detachstatements '
@@ -310,7 +310,7 @@ def get_principals_on_resource(session, resourceArn: str):
         '(s) - [:OnResource] -> (:AWSResourceBlob) - [:ExpandsTo] -> (u) '
         'WITH s,u '
         # Check if the statement actually has an action that can act on the resource
-        'MATCH (u) - [:TypeOf] -> (:AWSResourceType) <- [:ActsOn] - (a:AWSAction) <- [:AllowAction|DenyAction|ExpandsTo*1..2] - (s) '
+        'MATCH (u) - [:TypeOf] -> (:AWSResourceType) <- [:ActsOn] - (a:AWSAction) <- [:Action|ExpandsTo*1..2] - (s) '
         'WITH COLLECT(s) as statements, a,u '
         'MATCH  (s2:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo|MemberOf*1..4] -> (r) '
         'WHERE s2 IN statements AND (r:AWSRole OR r:AWSUser OR r:AWSGroup) '
