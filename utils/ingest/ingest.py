@@ -37,12 +37,14 @@ condition_key_to_condition_rels = {}
 operator_to_condition_rels = {}
 multi_operator_to_condition_rels = {}
 condition_value_to_condition_rels = {}
-allow_action_to_statement_rels = {}
-deny_action_to_statement_rels = {}
+statement_to_action_rels = {}
+statement_to_not_action_rels = {}
 statement_to_resource_rels = {}
+statement_to_not_resource_rels = {}
 statement_to_resource_blob_rels = {}
-statement_to_allow_action_blob_rels = {}
-statement_to_deny_action_blob_rels = {}
+statement_to_not_resource_blob_rels = {}
+statement_to_action_blob_rels = {}
+statement_to_not_action_blob_rels = {}
 condition_key_to_resource_rels = {}
 
 def get_hash(item_to_hash: dict):
@@ -50,6 +52,8 @@ def get_hash(item_to_hash: dict):
 
 
 def process_condition_value(condition_value):
+    if not condition_value:
+        condition_value = ""
     if condition_value not in condition_value_map:
         condition_value_map[condition_value] = {'name': condition_value}
 
@@ -109,6 +113,8 @@ def process_condition(operator: str, condition_keyvalue: dict):
             condition_values = [condition_values]
 
         for condition_value in condition_values:
+            if not condition_value:
+                condition_value = "empty"
             process_condition_value(condition_value)
             # Condition value to condition
             add_to_rels(condition_value_to_condition_rels, condition_value,
@@ -146,7 +152,7 @@ def replace_policy_var_with_wildcard(input_string: str):
     
     return result
 
-def process_resources(statement_hash, resources: list):
+def process_resources(statement_hash, resources: list, negated: bool):
     for resource in resources:
         regex = None
         is_root = False
@@ -174,7 +180,11 @@ def process_resources(statement_hash, resources: list):
                     'name': resource,
                     'regex': regex
                 }
-            add_to_rels(statement_to_resource_blob_rels, statement_hash,
+            if negated:
+                add_to_rels(statement_to_not_resource_blob_rels, statement_hash,
+                            resource)
+            else:
+                add_to_rels(statement_to_resource_blob_rels, statement_hash,
                         resource)
         else:
             # Some statements will have a principal ID instead of
@@ -182,9 +192,47 @@ def process_resources(statement_hash, resources: list):
             # of a role that has been deleted.
             # See: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#principal-roles
             if arn.Arn.is_arn(resource):
-                add_to_rels(statement_to_resource_rels, statement_hash, resource)
+                if negated:
+                    add_to_rels(statement_to_not_resource_rels, statement_hash,
+                                resource)
+                else:
+                    add_to_rels(statement_to_resource_rels, statement_hash, resource)
             else:
                 print(f"[*] Invalid resource ARN: {resource}")
+
+def process_actions(actions: list, effect: str, statement_hash: str, negated: bool):
+    for action in actions:
+        action = action.lower()
+        if "*" in action:
+            # If a specific AWS action is not defined,
+            # we will create a new ActionBlob node that
+            # will link to all of the actions that it
+            # encompasses
+            if action not in action_blob_map:
+                action_blob_map[action] = {
+                    "name": action,
+                    "regex": neo4j_escape_regex(action)
+                }
+            
+            if negated:
+                add_to_rels(statement_to_not_action_blob_rels,
+                            statement_hash,
+                            action)
+            else:
+                add_to_rels(statement_to_action_blob_rels,
+                            statement_hash,
+                            action)             
+        else:
+            # Action directly specified in statement
+            if negated:
+                add_to_rels(statement_to_not_action_rels,
+                            statement_hash,
+                            action)
+            else:
+                add_to_rels(statement_to_action_rels,
+                            statement_hash,
+                            action)
+
 
 def process_statement(statement):
     statement_hash = get_hash(statement)
@@ -204,54 +252,34 @@ def process_statement(statement):
             add_to_rels(hash_to_hash_rels, condition_hash, statement_hash)
 
     actions = statement.get('Action', [])
+    notActions = statement.get('NotAction', [])
     if not type(actions) == list:
         actions = [actions]
+    if not type(notActions) == list:
+        notActions = [notActions]
 
-    for action in actions:
-        action = action.lower()
-        if "*" in action:
-            # If a specific AWS action is not defined,
-            # we will create a new ActionBlob node that
-            # will link to all of the actions that it
-            # encompasses
-            if action not in action_blob_map:
-                action_blob_map[action] = {
-                    "name": action,
-                    "regex": neo4j_escape_regex(action)
-                }
-            if effect == "Allow":
-                add_to_rels(statement_to_allow_action_blob_rels,
-                            statement_hash,
-                            action)
-            elif effect == "Deny":
-                add_to_rels(statement_to_deny_action_blob_rels,
-                            statement_hash,
-                            action)
-            else:
-                print(f"[!] Unsupported effect: {effect}")                
-        else:
-            # Action directly specified in statement
-            if effect == "Allow":
-                add_to_rels(allow_action_to_statement_rels,
-                            statement_hash,
-                            action)
-            elif effect == "Deny":
-                add_to_rels(deny_action_to_statement_rels,
-                            statement_hash,
-                            action)
-            else:
-                print(f"[!] Unsupported effect: {effect}")
+    process_actions(actions, effect, statement_hash, False)
+    process_actions(notActions, effect, statement_hash, True)
 
     resources = statement.get('Resource', [])
     if not type(resources) == list:
         resources = [resources]
+    notResources = statement.get('NotResource', [])
+    if not type(notResources) == list:
+        notResources = [notResources]
 
-    process_resources(statement_hash, resources)
-    # This is for statements in trust policies
-    principals = statement.get('Principal', {}).get("AWS", [])
-    if not type(principals) == list:
-        principals = [principals]
-    process_resources(statement_hash, principals)
+    process_resources(statement_hash, resources, False)
+    process_resources(statement_hash, notResources, True)
+    
+    # # This is for statements in trust policies
+    # principals = statement.get('Principal', {}).get("AWS", [])
+    # notPrincipals = statement.get('NotPrincipal', {}).get("AWS", [])
+    # if not type(principals) == list:
+    #     principals = [principals]
+    # if not type(notPrincipals) == list:
+    #     notPrincipals = [notPrincipals]
+    # process_resources(statement_hash, principals, False)
+    # process_resources(statement_hash, notPrincipals, True)
 
     return statement_hash
 
@@ -374,7 +402,8 @@ def process_user(user):
     process_tags(user)
     process_principal_policies(user)
     for group_name in user["GroupList"]:
-        add_to_rels(member_of_rels, user_arn, group_name)
+        group_arn = get_arn_from_groupname(group_name, user_arn)
+        add_to_rels(member_of_rels, user_arn, group_arn)
 
 
 def process_role(role):
@@ -391,6 +420,11 @@ def process_role(role):
     tp_hash = process_trust_policy(role['AssumeRolePolicyDocument'])
     add_to_rels(hash_to_arn_rels, tp_hash, role_arn)
 
+def get_arn_from_groupname(groupname: str, arn: arn.Arn):
+    account_number = arn.account_id
+    for group in group_map.values():
+        if group['GroupName'] == groupname:
+            return group['Arn']
 
 def process_group(group):
     group_arn = arn.Arn.fromstring(group['Arn'])
@@ -423,7 +457,7 @@ def write_to_csv(filename, items, field_names):
         writer.writerows(lowercase_items)
 
 
-def json_to_csv(json_text, output_dir):
+def parse_json(json_text):
     auth_dictionary = json.loads(json_text)
     groups = auth_dictionary["GroupDetailList"]
     users = auth_dictionary["UserDetailList"]
@@ -439,77 +473,13 @@ def json_to_csv(json_text, output_dir):
     for role in roles:
         process_role(role)
 
-    for user in users:
-        process_user(user)
-
     for group in groups:
         process_group(group)
 
-    managed_policies_filename = os.path.join(output_dir,
-                                             "managedpolicies.csv")
+    for user in users:
+        process_user(user)
 
-    managed_policies_field_names = ["policyname", "policyid", "arn", "path",
-                                    "defaultversionid", "attachmentcount",
-                                    "permissionsboundaryusagecount",
-                                    "isattachable", "createdate",
-                                    "updatedate"]
-    write_to_csv(managed_policies_filename, managed_policy_map,
-                 managed_policies_field_names)
-
-    policy_version_filename = os.path.join(output_dir, "policyversions.csv")
-    policy_version_fields = ['hash', 'versionid', 'isdefaultversion',
-                             'createdate']
-    write_to_csv(policy_version_filename, policy_version_map,
-                 policy_version_fields)
-
-    inline_policy_filename = os.path.join(output_dir, "inlinepolicies.csv")
-    inline_poicy_fields = ['hash', 'policyname']
-    write_to_csv(inline_policy_filename, inline_policy_hash_map,
-                 inline_poicy_fields)
-
-    policy_document_filename = os.path.join(output_dir, "policydocuments.csv")
-    policy_document_fields = ['hash', 'version']
-    write_to_csv(policy_document_filename, permission_documents_map,
-                 policy_document_fields)
-
-    trust_policy_filename = os.path.join(output_dir, "assumerolepolicies.csv")
-    trust_policy_fields = ['hash', 'version', 'sid']
-    write_to_csv(trust_policy_filename, trust_policy_map, trust_policy_fields)
-
-    statements_filename = os.path.join(output_dir, "statements.csv")
-    statement_fields = ['hash', 'effect', 'sid']
-    write_to_csv(statements_filename, statements_map, statement_fields)
-
-    conditions_filename = os.path.join(output_dir, "conditions.csv")
-    condition_fields = ['hash', 'sid']
-    write_to_csv(conditions_filename, condition_map, condition_fields)
-
-    condition_value_filename = os.path.join(output_dir, "conditionvalues.csv")
-    write_to_csv(condition_value_filename, condition_value_map, ['name'])
-    groups_filename = os.path.join(output_dir, "groups.csv")
-    group_field_names = ["arn", "path", "groupname", "groupid",
-                         "createdate"]
-    write_to_csv(groups_filename, group_map, group_field_names)
-
-    roles_filename = os.path.join(output_dir, 'roles.csv')
-    role_field_names = ["arn", "path", "rolename", "roleid",
-                        "createdate", "rolelastused"]
-    write_to_csv(roles_filename, roles_map, role_field_names)
-
-    users_filename = os.path.join(output_dir, "users.csv")
-    user_field_names = ["arn", "path", "username", "userid",
-                        "createdate"]
-    write_to_csv(users_filename, user_map, user_field_names)
-
-    action_blobs_filename = os.path.join(output_dir, "actionblobs.csv")
-    write_to_csv(action_blobs_filename, action_blob_map, ['name', "regex"])
-
-    resource_blobs_filename = os.path.join(output_dir, "resourceblobs.csv")
-    write_to_csv(resource_blobs_filename, resource_blob_map,
-                 ['name', "regex"])
-
-    tags_filename = os.path.join(output_dir, "tags.csv")
-    write_to_csv(tags_filename, tag_map, ["hash", "key", "value"])
+    
 
 
 def ingest_csv(session, filename, datatype, fields):
@@ -628,7 +598,7 @@ def load_csvs_into_database():
         ingest_relationships(session, "arn_to_arn_rels.csv", "UniqueArn",
                              "arn", "AttachedTo", "UniqueArn", "arn")
         ingest_relationships(session, "member_of_rels.csv", "AWSUser", "arn",
-                             "MemberOf", "AWSGroup", "name")
+                             "MemberOf", "AWSGroup", "arn")
         ingest_relationships(session, "condition_key_to_condition_rels.csv",
                              "AWSConditionKey:UniqueName", "name",
                              "AttachedTo",
@@ -645,29 +615,37 @@ def load_csvs_into_database():
                              "AWSOperator:UniqueName", "name",
                              "AttachedTo",
                              "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "allow_action_to_statement_rels.csv",
+        ingest_relationships(session, "statement_to_action_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
                              "Action",
                              "AWSAction:UniqueName", "name")
-        ingest_relationships(session, "deny_action_to_statement_rels.csv",
+        ingest_relationships(session, "statement_to_not_action_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "Action",
+                             "NotAction",
                              "AWSAction:UniqueName", "name")
-        ingest_relationships(session, "statement_to_allow_action_blob_rels.csv",
+        ingest_relationships(session, "statement_to_action_blob_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
                              "Action",
                              "AWSActionBlob:UniqueName", "name")
-        ingest_relationships(session, "statement_to_deny_action_blob_rels.csv",
+        ingest_relationships(session, "statement_to_not_action_blob_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "Action",
+                             "NotAction",
                              "AWSActionBlob:UniqueName", "name")
         ingest_relationships(session, "statement_to_resource_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "OnResource",
+                             "Resource",
+                             "UniqueArn", "arn")
+        ingest_relationships(session, "statement_to_not_resource_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotResource",
                              "UniqueArn", "arn")
         ingest_relationships(session, "statement_to_resource_blob_rels.csv",
                              "AWSStatement:UniqueHash", "hash",
-                             "OnResource",
+                             "Resource",
+                             "AWSResourceBlob:UniqueName", "name")
+        ingest_relationships(session, "statement_to_not_resource_blob_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotResource",
                              "AWSResourceBlob:UniqueName", "name")
         ingest_relationships(session, "condition_key_to_resource_rels.csv",
                              "AWSConditionKey:UniqueName", "name",
@@ -712,31 +690,39 @@ def write_rels_to_csv(outputdir):
         outputdir,
         "condition_value_to_condition_rels.csv"
     )
-    allow_action_to_statement_rels_filename = os.path.join(
+    statement_to_action_rels_filename = os.path.join(
         outputdir,
-        "allow_action_to_statement_rels.csv"
+        "statement_to_action_rels.csv"
     )
-    deny_action_to_statement_rels_filename = os.path.join(
+    statement_to_not_action_rels_filename = os.path.join(
         outputdir,
-        "deny_action_to_statement_rels.csv"
+        "statement_to_not_action_rels.csv"
     )
     statement_to_resource_rels_filename = os.path.join(
         outputdir,
         "statement_to_resource_rels.csv"
     )
+    statement_to_not_resource_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_resource_rels.csv"
+    )
     statement_to_resource_blob_rels_filename = os.path.join(
         outputdir,
         "statement_to_resource_blob_rels.csv"
     )
-
-    statement_to_allow_action_blob_rels_filename = os.path.join(
+    statement_to_not_resource_blob_rels_filename = os.path.join(
         outputdir,
-        "statement_to_allow_action_blob_rels.csv"
+        "statement_to_not_resource_blob_rels.csv"
     )
 
-    statement_to_deny_action_blob_rels_filename = os.path.join(
+    statement_to_action_blob_rels_filename = os.path.join(
         outputdir,
-        "statement_to_deny_action_blob_rels.csv"
+        "statement_to_action_blob_rels.csv"
+    )
+
+    statement_to_not_action_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_action_blob_rels.csv"
     )
 
     condition_key_to_resource_rels_filename = os.path.join(
@@ -764,28 +750,30 @@ def write_rels_to_csv(outputdir):
     write_to_csv(condition_value_to_condition_rels_filename,
                  rels_to_unique_list(condition_value_to_condition_rels),
                  fields)
-    write_to_csv(allow_action_to_statement_rels_filename,
-                 rels_to_unique_list(allow_action_to_statement_rels),
+    write_to_csv(statement_to_action_rels_filename,
+                 rels_to_unique_list(statement_to_action_rels),
                  fields)
-    write_to_csv(deny_action_to_statement_rels_filename,
-                 rels_to_unique_list(deny_action_to_statement_rels),
-                 fields)
-    write_to_csv(statement_to_resource_rels_filename,
-                 rels_to_unique_list(statement_to_resource_rels),
+    write_to_csv(statement_to_not_action_rels_filename,
+                 rels_to_unique_list(statement_to_not_action_rels),
                  fields)
     write_to_csv(statement_to_resource_rels_filename,
                  rels_to_unique_list(statement_to_resource_rels),
+                 fields)
+    write_to_csv(statement_to_not_resource_rels_filename,
+                 rels_to_unique_list(statement_to_not_resource_rels),
                  fields)
     write_to_csv(statement_to_resource_blob_rels_filename,
                  rels_to_unique_list(statement_to_resource_blob_rels),
                  fields)
-    write_to_csv(statement_to_allow_action_blob_rels_filename,
-                 rels_to_unique_list(statement_to_allow_action_blob_rels),
+    write_to_csv(statement_to_not_resource_blob_rels_filename,
+                 rels_to_unique_list(statement_to_not_resource_blob_rels),
                  fields)
-    write_to_csv(statement_to_deny_action_blob_rels_filename,
-                 rels_to_unique_list(statement_to_deny_action_blob_rels),
+    write_to_csv(statement_to_action_blob_rels_filename,
+                 rels_to_unique_list(statement_to_action_blob_rels),
                  fields)
-    
+    write_to_csv(statement_to_not_action_blob_rels_filename,
+                 rels_to_unique_list(statement_to_not_action_blob_rels),
+                 fields)
     write_to_csv(condition_key_to_resource_rels_filename,
                  rels_to_unique_list(condition_key_to_resource_rels),
                  fields)
@@ -806,6 +794,74 @@ def delete_layer_1():
                 f"MATCH (n {{layer: {i}}}) "
                 "DELETE n"
             )
+
+
+def write_nodes_to_csv(output_dir: str):
+    managed_policies_filename = os.path.join(output_dir,
+                                             "managedpolicies.csv")
+
+    managed_policies_field_names = ["policyname", "policyid", "arn", "path",
+                                    "defaultversionid", "attachmentcount",
+                                    "permissionsboundaryusagecount",
+                                    "isattachable", "createdate",
+                                    "updatedate"]
+    write_to_csv(managed_policies_filename, managed_policy_map,
+                 managed_policies_field_names)
+
+    policy_version_filename = os.path.join(output_dir, "policyversions.csv")
+    policy_version_fields = ['hash', 'versionid', 'isdefaultversion',
+                             'createdate']
+    write_to_csv(policy_version_filename, policy_version_map,
+                 policy_version_fields)
+
+    inline_policy_filename = os.path.join(output_dir, "inlinepolicies.csv")
+    inline_poicy_fields = ['hash', 'policyname']
+    write_to_csv(inline_policy_filename, inline_policy_hash_map,
+                 inline_poicy_fields)
+
+    policy_document_filename = os.path.join(output_dir, "policydocuments.csv")
+    policy_document_fields = ['hash', 'version']
+    write_to_csv(policy_document_filename, permission_documents_map,
+                 policy_document_fields)
+
+    trust_policy_filename = os.path.join(output_dir, "assumerolepolicies.csv")
+    trust_policy_fields = ['hash', 'version', 'sid']
+    write_to_csv(trust_policy_filename, trust_policy_map, trust_policy_fields)
+
+    statements_filename = os.path.join(output_dir, "statements.csv")
+    statement_fields = ['hash', 'effect', 'sid']
+    write_to_csv(statements_filename, statements_map, statement_fields)
+
+    conditions_filename = os.path.join(output_dir, "conditions.csv")
+    condition_fields = ['hash', 'sid']
+    write_to_csv(conditions_filename, condition_map, condition_fields)
+
+    condition_value_filename = os.path.join(output_dir, "conditionvalues.csv")
+    write_to_csv(condition_value_filename, condition_value_map, ['name'])
+    groups_filename = os.path.join(output_dir, "groups.csv")
+    group_field_names = ["arn", "path", "groupname", "groupid",
+                         "createdate"]
+    write_to_csv(groups_filename, group_map, group_field_names)
+
+    roles_filename = os.path.join(output_dir, 'roles.csv')
+    role_field_names = ["arn", "path", "rolename", "roleid",
+                        "createdate", "rolelastused"]
+    write_to_csv(roles_filename, roles_map, role_field_names)
+
+    users_filename = os.path.join(output_dir, "users.csv")
+    user_field_names = ["arn", "path", "username", "userid",
+                        "createdate"]
+    write_to_csv(users_filename, user_map, user_field_names)
+
+    action_blobs_filename = os.path.join(output_dir, "actionblobs.csv")
+    write_to_csv(action_blobs_filename, action_blob_map, ['name', "regex"])
+
+    resource_blobs_filename = os.path.join(output_dir, "resourceblobs.csv")
+    write_to_csv(resource_blobs_filename, resource_blob_map,
+                 ['name', "regex"])
+
+    tags_filename = os.path.join(output_dir, "tags.csv")
+    write_to_csv(tags_filename, tag_map, ["hash", "key", "value"])
 
 
 if __name__ == "__main__":
@@ -831,6 +887,7 @@ if __name__ == "__main__":
             if filename.endswith('.json'):
                 with open(os.path.join(input_dir, filename), 'r') as f:
                     text = f.read()
-                    json_to_csv(text, output_dir)
-                    write_rels_to_csv(output_dir)
-                    load_csvs_into_database()
+                    parse_json(text)
+        write_nodes_to_csv(output_dir)
+        write_rels_to_csv(output_dir)
+        load_csvs_into_database()

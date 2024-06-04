@@ -312,6 +312,7 @@ def create_constraints(driver):
                           'AWSResourceBlob', 'name')
         create_constraint(session, "tagconstraint",
                           'AWSTag', 'hash')
+        create_constraint(session, "uniquehashconstraint", 'UniqueHash', 'hash')
 
 def create_indices(driver):
     with driver.session() as session:
