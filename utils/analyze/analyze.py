@@ -7,22 +7,70 @@ from neo4j import GraphDatabase
 
 def populate_resource_blob(session):
     print("[*] Expanding resource blobs")
-    session.run(
-        "MATCH (a:AWSResourceBlob) "
-        "MATCH (b:UniqueArn) "
-        "WHERE b.arn =~ a.regex "
-        "MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)"
+    cypher_query = """
+    CALL apoc.periodic.iterate(
+        "MATCH (a:AWSResourceBlob) RETURN a",
+        "
+        MATCH (b:UniqueArn)
+        WHERE b.arn =~ a.regex
+        MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
+        ",
+        {batchSize: 1000, parallel: true}
     )
+    """
+    session.run(
+       cypher_query
+    )
+
+
+# def populate_not_resources(session):
+#     print("[*] Expanding not resource blobs")
+#     cypher_query = """
+#     CALL apoc.periodic.iterate(
+#         "MATCH (s:AWSStatement) - [:NotResource] -> (b:AWSResourceBlob) RETURN s",
+#         "
+#         MATCH (r:AWSResourceBlob {name: '*'})
+#         MERGE (s) - [:Resource {layer: 2}] -> (r)
+#         ",
+#         {batchSize: 1000, parallel: true}
+#     )
+#     """
+#     session.run(cypher_query)
 
 
 def populate_action_blob(session):
     print("[*] Expanding action blobs")
-    session.run(
-        "MATCH (a:AWSActionBlob) "
-        "MATCH (b:UniqueName) "
-        "WHERE b.name =~ a.regex "
-        "MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)"
+    cypher_query = """
+    CALL apoc.periodic.iterate(
+        "MATCH (a:AWSActionBlob) RETURN a",
+        "
+        MATCH (b:UniqueName)
+        WHERE b.name =~ a.regex
+        MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
+        ",
+        {batchSize: 1000, parallel: true}
     )
+    """
+    session.run(
+        cypher_query
+    )
+
+# def populate_not_actions(session):
+#     print("[*] Expanding not action blobs")
+#     # If the statement uses a notaction, we will simply
+#     # point the action blob to a wildcard action. The 
+#     # filtering logic will be done post query
+#     cypher_query = """
+#     CALL apoc.periodic.iterate(
+#         "MATCH (s:AWSStatement) - [:NotAction] -> (b:AWSAction|AWSActionBlob) RETURN s",
+#         "
+#         MATCH (a:AWSAction {name: '*'})
+#         MERGE (s) - [:Action {layer: 2}] -> (a)
+#         ",
+#         {batchSize: 1000, parallel: true}
+#     )
+#     """
+#     session.run(cypher_query)
 
 def convert_variable_arn_to_regex(variable_arn: str) -> str:
     variable_pattern = r'\${[^}]+}'
@@ -84,6 +132,9 @@ def populate_resource_types(session):
 
         resource_type = resource_type_map.get(resource_arn, None)
         if not resource_type:
+            if not node['resource']:
+                print("[!] Could not retrive info for node: " + str(node))
+                continue
             fast_name = ":".join([node['service'], node['resource'].split("/")[0].split(":")[0]])
             for resource_type in resource_types:
                 if fast_name == resource_type[0]:
@@ -130,9 +181,9 @@ def get_allow_assume_role_statements(session):
             COLLECT(denyStatement) as denyStatements
 
         UNWIND allowStatements as allowSt
-        MATCH (allowSt)-[:OnResource|ExpandsTo*1..2]->(r:AWSRole)
+        MATCH (allowSt)-[:Resource|ExpandsTo*1..2]->(r:AWSRole)
         WITH DISTINCT r, prin, denyStatements, allowSt
-        WHERE NONE(denySt IN denyStatements WHERE (denySt)-[:OnResource]->(r) OR (denySt)-[:OnResource]->(:AWSResourceBlob)-[:ExpandsTo]->(r))
+        WHERE NONE(denySt IN denyStatements WHERE (denySt)-[:Resource]->(r) OR (denySt)-[:Resource]->(:AWSResourceBlob)-[:ExpandsTo]->(r))
         MERGE (prin) - [:AllowPermissionSTSAssumeRole {layer: 2, statement:allowSt.hash}] -> (r)
     """
     session.run(query)
@@ -153,9 +204,9 @@ def get_allow_assume_role_statements(session):
 
         UNWIND allowStatements as allowSt
 
-        MATCH (allowSt)-[:OnResource|ExpandsTo*1..2]->(r:UniqueArn)
+        MATCH (allowSt)-[:Resource|ExpandsTo*1..2]->(r:UniqueArn)
         WITH DISTINCT r, prin, denyStatements, allowSt
-        WHERE NONE(denySt IN denyStatements WHERE (denySt)-[:OnResource]->(r) OR (denySt)-[:OnResource]->(:AWSResourceBlob)-[:ExpandsTo]->(r))
+        WHERE NONE(denySt IN denyStatements WHERE (denySt)-[:Resource]->(r) OR (denySt)-[:Resource]->(:AWSResourceBlob)-[:ExpandsTo]->(r))
         MERGE (prin) - [:AllowTrustSTSAssumeRole {layer: 2, statement:allowSt.hash}] -> (r)
     """
     session.run(query)
@@ -168,7 +219,6 @@ def get_allow_assume_role_statements(session):
     session.run(query)
 
     query = """
-    MATCH (dest:AWSRole) - [:AllowTrustSTSAssumeRole] -> (source:AWSUser) - [:MemberOf] -> (g:AWSGroup) - [:AllowPermissionSTSAssumeRole] -> (dest)
     MERGE (source) - [:CanAssume {layer: 2} ] -> (dest)
     """
     session.run(query)
@@ -205,7 +255,7 @@ def get_tier_zero_roles(session):
     # This query gets all principals that have statements that permit
     # Attach and Detach a user role policies to themselves
     query = (
-        'MATCH (r:AWSRole) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSRole) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachrolepolicy"}) '
         'WHERE s in statements '
@@ -220,7 +270,7 @@ def get_tier_zero_roles(session):
     allow_arns = [role_arn[0] for role_arn in query_results]
 
     query = (
-        'MATCH (r:AWSRole) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSRole) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:DenyAction|ExpandsTo*1..2] -> (a:AWSAction) '
         'WHERE s in statements AND a.name in ["iam:attachrolepolicy", "iam:detachrolepolicy"] '
@@ -243,7 +293,7 @@ def get_tier_zero_users(session):
     # This query gets all principals that have statements that permit
     # Attach and Detach a user role policies to themselves
     query = (
-        'MATCH (r:AWSUser) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSUser) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachuserpolicy"}) '
         'WHERE s in statements '
@@ -258,7 +308,7 @@ def get_tier_zero_users(session):
     allow_arns = [user_arn[0] for user_arn in query_results]
 
     query = (
-        'MATCH (r:AWSUser) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSUser) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:DenyAction|ExpandsTo*1..2] -> (a:AWSAction) '
         'WHERE s in statements AND a.name in ["iam:attachuserpolicy", "iam:detachuserpolicy"] '
@@ -274,7 +324,7 @@ def get_tier_zero_groups(session):
     # This query gets all principals that have statements that permit
     # Attach and Detach a user role policies to themselves
     query = (
-        'MATCH (r:AWSGroup) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSGroup) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: "iam:attachgrouppolicy"}) '
         'WHERE s in statements '
@@ -289,7 +339,7 @@ def get_tier_zero_groups(session):
     allow_arns = [group_arn[0] for group_arn in query_results]
 
     query = (
-        'MATCH (r:AWSGroup) <- [:OnResource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
+        'MATCH (r:AWSGroup) <- [:Resource|ExpandsTo*1..2] - (s:AWSStatement) - [:AttachedTo] -> (:AWSPolicyDocument) - [:AttachedTo*1..3] -> (r) '
         'WITH r,COLLECT(s) as statements '
         'MATCH p=(r) <- [:AttachedTo*1..3] - (:AWSPolicyDocument) <- [:AttachedTo] - (s) - [:DenyAction|ExpandsTo*1..2] -> (a:AWSAction) '
         'WHERE s in statements AND a.name in ["iam:attachgrouppolicy", "iam:detachgrouppolicy"] '
@@ -306,8 +356,8 @@ def get_principals_on_resource(session, resourceArn: str):
     # Get all statements that affect the provided principal
     query = (
         f'MATCH (s:AWSStatement), (u:UniqueArn {{arn: "{resourceArn}"}}) '
-        'WHERE (s) - [:OnResource] -> (u) OR '
-        '(s) - [:OnResource] -> (:AWSResourceBlob) - [:ExpandsTo] -> (u) '
+        'WHERE (s) - [:Resource] -> (u) OR '
+        '(s) - [:Resource] -> (:AWSResourceBlob) - [:ExpandsTo] -> (u) '
         'WITH s,u '
         # Check if the statement actually has an action that can act on the resource
         'MATCH (u) - [:TypeOf] -> (:AWSResourceType) <- [:ActsOn] - (a:AWSAction) <- [:Action|ExpandsTo*1..2] - (s) '
@@ -351,25 +401,42 @@ def get_principals_on_resource(session, resourceArn: str):
 
 def populate_arn_fields(session):
     print("[*] Extrapolating ARN properties")
-    results = session.run("MATCH (u:UniqueArn) RETURN u")
-    for result in results:
-        try:
-            node_arn_string = result['u']['arn']
-            node_arn = arn.Arn.fromstring(node_arn_string)
-            query = (
-                f'MATCH (u:UniqueArn {{arn: "{node_arn_string}"}}) '
-                f'SET u.partition = "{node_arn.partition}" '
-                f'SET u.service =  "{node_arn.service}" '
-                f'SET u.region = "{node_arn.region}" '
-                f'SET u.account_id = "{node_arn.account_id}" '
-                f'SET u.resource = "{node_arn.resource}" '
-                f'MERGE (a:AWSAccount {{account_id: "{node_arn.account_id}", layer: 2}}) '
-                f'MERGE (u) - [:InAccount {{layer: 2}}] -> (a)'
-            )
+    # results = session.run("MATCH (u:UniqueArn) RETURN u")
+    # for result in results:
+    #     try:
+    #         node_arn_string = result['u']['arn']
+    #         node_arn = arn.Arn.fromstring(node_arn_string)
+    #         query = (
+    #             f'MATCH (u:UniqueArn {{arn: "{node_arn_string}"}}) '
+    #             f'SET u.partition = "{node_arn.partition}" '
+    #             f'SET u.service =  "{node_arn.service}" '
+    #             f'SET u.region = "{node_arn.region}" '
+    #             f'SET u.account_id = "{node_arn.account_id}" '
+    #             f'SET u.resource = "{node_arn.resource}" '
+    #             f'MERGE (a:AWSAccount {{account_id: "{node_arn.account_id}", layer: 2}}) '
+    #             f'MERGE (u) - [:InAccount {{layer: 2}}] -> (a)'
+    #         )
 
-            session.run(query)
-        except ValueError:
-            continue
+    #         session.run(query)
+    #     except ValueError:
+    #         continue
+    cypher_query = """
+    CALL apoc.periodic.iterate(
+        "MATCH (u:UniqueArn) RETURN u",
+        "
+        WITH u, apoc.text.regexGroups(u.arn, 'arn:([^:]*):([^:]*):([^:]*):([^:]*):(.+)')[0] AS arn_parts
+        WHERE size(arn_parts) = 6
+        SET u.partition = arn_parts[1],
+            u.service = arn_parts[2],
+            u.region = arn_parts[3],
+            u.account_id = arn_parts[4],
+            u.resource = arn_parts[5]
+        RETURN u, arn_parts
+        ",
+        {batchSize: 1000, parallel: true}
+    )
+    """
+    session.run(cypher_query)
 
 
 def analyze():
@@ -380,7 +447,9 @@ def analyze():
         populate_arn_fields(session)
         populate_resource_types(session)
         populate_action_blob(session)
+        #populate_not_actions(session)
         populate_resource_blob(session)
+        #populate_not_resources(session)
         #(session)
 
         # For process each statement and find unconditional
