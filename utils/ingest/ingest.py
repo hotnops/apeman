@@ -127,7 +127,7 @@ def neo4j_escape_regex(unescaped_string: str):
     unescaped_string = unescaped_string.replace(".", "\\.")
     unescaped_string = unescaped_string.replace("*", ".*")
     unescaped_string = unescaped_string.replace("?", "\\?")
-    unescaped_string = unescaped_string.replace("[", "\\[]")
+    unescaped_string = unescaped_string.replace("[", "\\[")
     return unescaped_string
 
 def has_policy_variable(resource: str):
@@ -272,13 +272,13 @@ def process_statement(statement):
     process_resources(statement_hash, notResources, True)
     
     # # This is for statements in trust policies
-    # principals = statement.get('Principal', {}).get("AWS", [])
+    principals = statement.get('Principal', {}).get("AWS", [])
     # notPrincipals = statement.get('NotPrincipal', {}).get("AWS", [])
-    # if not type(principals) == list:
-    #     principals = [principals]
+    if not type(principals) == list:
+        principals = [principals]
     # if not type(notPrincipals) == list:
     #     notPrincipals = [notPrincipals]
-    # process_resources(statement_hash, principals, False)
+    process_resources(statement_hash, principals, False)
     # process_resources(statement_hash, notPrincipals, True)
 
     return statement_hash
@@ -512,8 +512,11 @@ def ingest_csv(session, filename, datatype, fields):
     for field in fields:
         query += f"a.{field} = {field}, "
     query += "a.layer = 1 "
-
-    session.run(query)
+    try:
+        session.run(query)
+    except Exception as e:
+        print(e)
+        import pdb; pdb.set_trace()
 
 
 def ingest_resources(session, filename):
@@ -536,7 +539,7 @@ def ingest_relationships(session, filename, source_label, source_field,
         f'LOAD CSV FROM "file:///{filename}" AS row '
         'CALL { '
         'WITH row '
-        f'MERGE (s:{source_label} {{{source_field}: row[0]}}) '
+        f'MERGE (s:{source_label} {{{source_field}: row[0], layer: 1}}) '
         f'ON CREATE SET s.inferred = true '
         f'MERGE (d:{dest_label} {{{dest_field}: row[1]}}) '
         f'ON CREATE SET d.inferred = true '
@@ -792,6 +795,16 @@ def delete_layer_1():
 
             session.run(
                 f"MATCH (n {{layer: {i}}}) "
+                "DELETE n"
+            )
+
+            session.run(
+                "MATCH (n) - [r] - () WHERE n.layer IS NULL "
+                "DETACH DELETE r"
+            )
+
+            session.run(
+                "MATCH (n) WHERE n.layer IS NULL "
                 "DELETE n"
             )
 

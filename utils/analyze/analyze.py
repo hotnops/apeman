@@ -15,12 +15,20 @@ def populate_resource_blob(session):
         WHERE b.arn =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
         ",
-        {batchSize: 1000, parallel: true}
-    )
+        {
+            batchSize: 10, 
+            parallel: true
+        }
+    ) YIELD batch, failedBatches, errorMessages
+    RETURN batch, failedBatches, errorMessages
     """
-    session.run(
-       cypher_query
-    )
+    result = session.run(cypher_query)
+    
+    for record in result:
+        if record['failedBatches'] > 0:
+            print(f"Batch {record['batch']} failed with errors: {record['errorMessages']}")
+        else:
+            print(f"Batch {record['batch']} processed successfully")
 
 
 # def populate_not_resources(session):
@@ -48,7 +56,7 @@ def populate_action_blob(session):
         WHERE b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
         ",
-        {batchSize: 1000, parallel: true}
+        {batchSize: 10, parallel: true}
     )
     """
     session.run(
@@ -81,24 +89,6 @@ def convert_variable_arn_to_regex(variable_arn: str) -> str:
     return variable_arn
 
 
-def get_resource_type_from_arn(resource_arn: str, resource_regexes) -> str:
-    for resource_regex, resource_name in resource_regexes.items():
-        if re.match(resource_regex, resource_arn):
-            return resource_name
-    return None
-    """
-    parsed_arn = arn.Arn.fromstring(resource_arn)
-    if parsed_arn.resource and parsed_arn.service:
-        resource_base = parsed_arn.resource.split("/")[0]
-        return f"{parsed_arn.service}:{resource_base}"
-    return None
-    """
-
-
-def get_all_resource_types(session):
-    results = session.run("MATCH (t:AWSResourceType) RETURN t.name, t.arn")
-    return results.values()
-
 
 def get_all_arn_nodes(session):
     results = session.run("MATCH (u:UniqueArn) RETURN u")
@@ -108,59 +98,15 @@ def get_all_arn_nodes(session):
 def populate_resource_types(session):
     print("[*] Expanding resources types")
     print("[*] Getting all resource types")
-    resource_types = get_all_resource_types(session)
-    resource_regexes = {}
-    for resource_type in resource_types:
-        try:
-            regex = convert_variable_arn_to_regex(resource_type[1])
-            if regex == "arn":
-                continue
-        except TypeError:
-            continue
-        resource_regexes[regex] = resource_type[0]
-
-    print("[*] Getting all arn nodes")
-    resources_nodes = get_all_arn_nodes(session)
-
-    resource_type_map = {}
-    print("[*] Building resource type map")
-    for resource_node in resources_nodes:
-        node = resource_node[0]
-        resource_arn = node['arn']
-        if resource_arn == "arn":
-            continue
-
-        resource_type = resource_type_map.get(resource_arn, None)
-        if not resource_type:
-            if not node['resource']:
-                print("[!] Could not retrive info for node: " + str(node))
-                continue
-            fast_name = ":".join([node['service'], node['resource'].split("/")[0].split(":")[0]])
-            for resource_type in resource_types:
-                if fast_name == resource_type[0]:
-                    resource_type_map[resource_arn] = resource_type[0]
-                    break
-
-        resource_type = resource_type_map.get(resource_arn, None)
-        if not resource_type:
-            print("[*] Doing regex lookup for arn: " + resource_arn)
-            resource_type = get_resource_type_from_arn(resource_arn, resource_regexes)
-            if resource_type:
-                resource_type_map[resource_arn] = resource_type
-    
-    print("[*] Building lists")
-    key_list = []
-    value_list = []
-    for key, value in resource_type_map.items():
-        key_list.append(key)
-        value_list.append(value)
-
-    session.run('WITH $arns as arns, $resource_types as resource_types '
-                'UNWIND range(0, size(arns) - 1) AS index '
-                'WITH arns[index] AS arn, resource_types[index] as resource_type '
-                'MATCH (u:UniqueArn {arn: arn}), (r:AWSResourceType {name: resource_type}) '
-                'WITH u,r MERGE (u) - [:TypeOf {layer: 2}] -> (r)',
-                arns=key_list, resource_types=value_list)
+    cypher_query = """
+    CALL apoc.periodic.iterate(
+        "MATCH (a:AWSResourceType) RETURN a",
+        "MATCH (b:UniqueArn) WHERE (b.arn =~ a.regex)
+         MERGE (b)  - [:TypeOf] -> (a)",
+        {batchSize: 10, parallel: true}
+        )
+    """
+    session.run(cypher_query)
 
 def get_allow_assume_role_statements(session):
     print("[*] Getting assume role statements")
@@ -456,7 +402,7 @@ def analyze():
         # sts:assumerole actions and map them to the resources
         # identified in that statement
 
-        statements = get_allow_assume_role_statements(session)
+        #statements = get_allow_assume_role_statements(session)
         #for statement in statements:
         #    create_can_assume_edge(statement)
 

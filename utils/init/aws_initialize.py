@@ -8,6 +8,7 @@ import multiprocessing
 import neo4j
 import os
 import pandas as pd
+import re
 import requests
 import shutil
 import time
@@ -146,6 +147,17 @@ def get_all_services_html(data):
 
     return ret_data.copy()
 
+def escape_regex_chars(text):
+    # We are omitting * and . from the list of special characters
+    special_chars = r'\^$|?+()[]{}'
+    escaped_text = ''
+    for char in text:
+        if char in special_chars:
+            escaped_text += '\\' + char
+        else:
+            escaped_text += char
+    return escaped_text
+
 
 def get_service_prefix(service_name):
     if not os.path.exists(SERVICE_METADATA_FILE):
@@ -160,6 +172,15 @@ def get_service_prefix(service_name):
             print(f"[*] Service name: {service_name} not found")
             return None
         return service_data[service_name]["StringPrefix"]
+    
+def convert_regex_to_wildcard(arn):
+    
+    variable_pattern = re.compile(r'\$\{[^}]+\}')
+    wildcard_arn = variable_pattern.sub('.*', arn)    
+    # Replace consecutive asterisks with a single asterisk
+    wildcard_arn = re.sub(r'\.\*+', '.*', wildcard_arn)
+    wildcard_arn = escape_regex_chars(wildcard_arn)
+    return wildcard_arn
 
 
 def write_data_to_csv(actions: dict, actions_file, resources_file,
@@ -186,9 +207,10 @@ def write_data_to_csv(actions: dict, actions_file, resources_file,
         for resource_type in resource_types:
             name = resource_type['Resource types']
             resource_arn = resource_type['ARN']
+            regex = convert_regex_to_wildcard(resource_arn)
             rt_service = arn.Arn.fromstring(resource_arn).service
             full_name = f"{rt_service}:{name}"
-            lines.append(f"{full_name},{resource_arn}\n".lower())
+            lines.append(f"{full_name},{resource_arn},{regex}\n".lower())
         resources_file.writelines(lines)
 
         lines = []
@@ -254,7 +276,7 @@ def load_csvs_into_database(driver):
         ingest_csv(session, "awsoperators.csv", "AWSOperator:UniqueName",
                    ["name"])
         ingest_csv(session, "awsresourcetypes.csv", "AWSResourceType:UniqueName",
-                   ["name", "arn"])
+                   ["name", "arn", "regex"])
         ingest_csv(session, "awsglobalconditionkeys.csv", "AWSConditionKey:UniqueName",
                    ["name"])
         ingest_csv(session, "awsconditionkeys.csv", "AWSConditionKey:UniqueName",
