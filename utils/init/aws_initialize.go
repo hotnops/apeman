@@ -9,7 +9,7 @@ import (
 	"regexp"
 )
 
-// PolicyEditorConfig represents the top-level JSON structure
+	// PolicyEditorConfig represents the top-level JSON structure
 	type PolicyEditorConfig struct {
 		PolicyEditorConfig_1 []string                  `json: "app.PolicyEditorConfig"`
 		ConditionOperators   []string                  `json:"conditionOperators"`
