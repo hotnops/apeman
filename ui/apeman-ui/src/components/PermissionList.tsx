@@ -1,10 +1,18 @@
-import { Accordion, HStack, IconButton, Input, Text } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  Input,
+  List,
+  ListItem,
+  Text,
+} from "@chakra-ui/react";
 import { MdFilterAlt } from "react-icons/md";
-import { Permission } from "../hooks/usePermissions";
 import { useEffect, useState } from "react";
-import PermissionItem from "./PermissionItem";
 import apiClient from "../services/api-client";
 import { IoCloseCircle } from "react-icons/io5";
+import { useApemanGraph } from "../hooks/useApemanGraph";
+import { Path, addPathToGraph } from "../services/pathService";
 
 interface Props {
   children: string;
@@ -13,29 +21,21 @@ interface Props {
 
 const PermissionList = ({ children, endpoint }: Props) => {
   const [_, setError] = useState<Error | null>(null);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [__, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [, setSearchQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
+  const [paths, setPaths] = useState<Path[]>([]);
+  const { addNode, addEdge } = useApemanGraph();
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log("text change");
     setSearchQuery(event.target.value);
   };
 
-  const getFilteredPermissions = (permissions: Permission[]) => {
-    console.log("Filtering list");
-    return permissions.filter((permission) =>
-      Object.keys(permission.actions).some((action) =>
-        action.includes(searchQuery)
-      )
-    );
-  };
-
   const fetchData = () => {
     const controller = new AbortController();
 
-    const request = apiClient.get<Permission[]>(endpoint, {
+    const request = apiClient.get<Path[]>(endpoint, {
       signal: controller.signal,
     });
 
@@ -53,7 +53,9 @@ const PermissionList = ({ children, endpoint }: Props) => {
     setLoading(true);
     request
       .then((res) => {
-        setPermissions(res.data);
+        //setPermissions(res.data);
+        // Create a string to action list map
+        setPaths(res.data);
       })
       .catch((err) => {
         setError(err);
@@ -91,15 +93,24 @@ const PermissionList = ({ children, endpoint }: Props) => {
         ></IconButton>
       </HStack>
 
-      <Accordion allowToggle>
-        {getFilteredPermissions(permissions).map((permission) => (
-          <PermissionItem
-            key={permission.arn}
-            queryString={searchQuery}
-            {...permission}
-          ></PermissionItem>
+      <List>
+        {paths.map((path) => (
+          <ListItem>
+            <HStack>
+              <Text>
+                {path.Nodes[path.Nodes.length - 1].properties.map["name"]}
+              </Text>
+              <Button
+                onClick={() => {
+                  addPathToGraph(path, addNode, addEdge);
+                }}
+              >
+                Add To Graph
+              </Button>
+            </HStack>
+          </ListItem>
         ))}
-      </Accordion>
+      </List>
     </>
   );
 };

@@ -24,8 +24,8 @@ services:
     environment:
       - NEO4JLABS_PLUGINS=["apoc"]
       - NEO4J_AUTH=none
-      - NEO4J_server_memory_heap_initial__size=4G
-      - NEO4J_server_memory_heap_max__size=6G
+      - NEO4J_server_memory_heap_initial__size=8G
+      - NEO4J_server_memory_heap_max__size=10G
       - NEO4J_server_memory_pagecache_size=4G
 
   apeman-frontend:
@@ -46,6 +46,8 @@ services:
     build:
       context: ./cmd
       dockerfile: Dockerfile_dev
+    volumes:
+      - ./go-mod-cache:/go/pkg/mod
     image: apeman-backend-dev
     ports:
       - "2345:2345"

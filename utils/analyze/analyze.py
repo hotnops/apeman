@@ -52,7 +52,7 @@ def populate_action_blob(session):
     CALL apoc.periodic.iterate(
         "MATCH (a:AWSActionBlob) RETURN a",
         "
-        MATCH (b:UniqueName)
+        MATCH (b:AWSAction)
         WHERE b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
         ",

@@ -539,10 +539,10 @@ def ingest_relationships(session, filename, source_label, source_field,
         f'LOAD CSV FROM "file:///{filename}" AS row '
         'CALL { '
         'WITH row '
-        f'MERGE (s:{source_label} {{{source_field}: row[0], layer: 1}}) '
-        f'ON CREATE SET s.inferred = true '
+        f'MERGE (s:{source_label} {{{source_field}: row[0]}}) '
+        f'ON CREATE SET s.inferred = true, s.layer = 1 '
         f'MERGE (d:{dest_label} {{{dest_field}: row[1]}}) '
-        f'ON CREATE SET d.inferred = true '
+        f'ON CREATE SET d.inferred = true, d.layer = 1 '
         f'MERGE (s) - [:{rel_name} {{layer: 1}}] -> (d) '
         '} IN TRANSACTIONS'
     )

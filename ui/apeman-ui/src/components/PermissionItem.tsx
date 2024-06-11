@@ -4,42 +4,27 @@ import {
   AccordionItem,
   AccordionPanel,
   Box,
-  Highlight,
   List,
-  ListItem,
   Text,
 } from "@chakra-ui/react";
+import { Path } from "../services/pathService";
 
 interface Props {
-  arn: string;
-  actions: {};
-  queryString: string;
+  path: Path;
 }
-const PermissionItem = ({ arn, actions, queryString }: Props) => {
+const PermissionItem = ({ path }: Props) => {
   return (
     <AccordionItem>
       <h2>
         <AccordionButton>
           <Box as="span" flex="1" textAlign="left">
-            <Text fontWeight="bold">{arn}</Text>
+            <Text fontWeight="bold">{path.Nodes[0].properties.map["arn"]}</Text>
           </Box>
           <AccordionIcon />
         </AccordionButton>
       </h2>
       <AccordionPanel>
-        <List spacing={3}>
-          {Object.keys(actions).map((action) => (
-            <ListItem>
-              {queryString ? (
-                <Highlight query={queryString} styles={{ fontWeight: "bold" }}>
-                  {action}
-                </Highlight>
-              ) : (
-                <>{action}</>
-              )}
-            </ListItem>
-          ))}
-        </List>
+        <List spacing={3}></List>
       </AccordionPanel>
     </AccordionItem>
   );
