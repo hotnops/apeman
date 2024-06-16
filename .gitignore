@@ -7,3 +7,4 @@ graph_data/
 import/
 node_modules/
 gaad/
+go-mod-cache/
