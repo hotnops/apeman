@@ -1,5 +1,10 @@
 package api
 
+// The server file is the API interface, and all parameters
+// should be as generic as possible. This layer should commonly
+// convert string parametes to their corresponding graph IDs
+// when possible.
+
 import (
 	"context"
 	"encoding/base64"
@@ -9,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hotnops/apeman/analyze"
 	"github.com/hotnops/apeman/graphschema/aws"
 	"github.com/hotnops/apeman/src/api/src/queries"
 	"github.com/hotnops/apeman/src/config"
@@ -50,6 +56,7 @@ func (s *Server) GetAWSNodes(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusOK, nodes)
 }
+
 func (s *Server) GetAWSNodeByGraphID(c *gin.Context) {
 	propertyName := "nodeid"
 	idString := c.Param(propertyName)
@@ -59,7 +66,7 @@ func (s *Server) GetAWSNodeByGraphID(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
 
-	node, err := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(id))
+	node, err := analyze.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(id))
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -252,7 +259,7 @@ func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 	if arnString, err := DecodeArn((encodedArn)); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	} else {
-		paths, err := queries.GetAWSResourceInboundPermissions(s.ctx, s.db, arnString)
+		paths, err := queries.GetAllIdentityPolicyPathsOnArn(s.ctx, s.db, arnString)
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
@@ -288,23 +295,6 @@ func (s *Server) GetAWSResource(c *gin.Context) {
 		nodes, err := queries.GetAWSNodeByKindID(s.ctx, s.db, propertyName, arnString, aws.UniqueArn)
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
-		}
-		c.IndentedJSON(http.StatusOK, nodes)
-	}
-}
-
-func (s *Server) GetAWSInboundPrincipalsWithAction(c *gin.Context) {
-	arnName := "arn"
-	actionName := "action"
-
-	encodedArn := c.Param(arnName)
-	action := c.Param(actionName)
-	if arnString, err := DecodeArn((encodedArn)); err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
-	} else {
-		nodes, err := queries.GetAWSResourceInboundPrincipalsWithAction(s.ctx, s.db, arnString, action)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
 		}
 		c.IndentedJSON(http.StatusOK, nodes)
 	}
@@ -432,15 +422,16 @@ func (s *Server) GetNodeIdentityPath(c *gin.Context) {
 }
 
 func (s *Server) GetInboundRoles(c *gin.Context) {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	log.Printf("[*] GetInboundRoles")
 	roleId := c.Param("roleid")
 
-	query := fmt.Sprintf("MATCH p=(s) - [:CanAssume] -> (r:AWSRole) WHERE r.roleid = '%s' RETURN p", roleId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
-	c.IndentedJSON(http.StatusOK, paths)
+	c.IndentedJSON(http.StatusOK, paths.GetPaths())
 
 }
 
@@ -457,6 +448,15 @@ func (s *Server) GetAWSTierZeroNodes(c *gin.Context) {
 	} else {
 		c.IndentedJSON(http.StatusOK, paths.AllNodes().Slice())
 	}
+}
+
+func (s *Server) GetAllAssumeRoles(c *gin.Context) {
+	err := queries.CreateAssumeRoleEdges(s.ctx, s.db)
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+	c.Done()
 }
 
 func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
@@ -489,7 +489,6 @@ func (s *Server) handleRequests() {
 	router.GET("/accounts/:account_id", s.GetAWSAccount)
 	router.GET("/resources/:arn", s.GetAWSResource)
 	router.GET("/resources/:arn/inboundpermissions", s.GetAWSResourceInboundPermissions)
-	router.GET("/resources/:arn/inboundpermissions/:action", s.GetAWSInboundPrincipalsWithAction)
 	router.GET("/conditionkeys/active", s.GetActiveAWSConditionKeys)
 	router.GET("/node", s.GetAWSNodes)
 	router.GET("/node/:nodeid", s.GetAWSNodeByGraphID)
@@ -502,6 +501,7 @@ func (s *Server) handleRequests() {
 	router.GET("/node/:nodeid/tierzero", s.GetAWSTierZeroNodes) // This needs to be redone
 	router.GET("/node/:nodeid/tierzeropaths", s.GetAWSTierZeroPaths)
 	router.GET("/relationship/:relationshipid", s.GetAWSRelationshipByGraphID)
+	router.GET("/analyze/assumeroles", s.GetAllAssumeRoles)
 	router.GET("/search", s.Search)
 	router.POST("/query", s.PostQuery)
 	router.Run("0.0.0.0:4400")

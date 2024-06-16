@@ -1,9 +1,9 @@
 FROM golang:1.20
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 WORKDIR /src
+VOLUME /go
 COPY go.mod go.sum go.work ./
 COPY . .
-RUN go mod download
 RUN go build -gcflags="all=-N -l" -o ./api/main ./api/main.go
 EXPOSE 2345
 CMD ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "exec", "/src/api/main"]

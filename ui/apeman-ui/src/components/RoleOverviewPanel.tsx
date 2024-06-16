@@ -3,12 +3,9 @@ import NodeService, { Node } from "../services/nodeService";
 import { Accordion, Table, Tbody, Td, Tr } from "@chakra-ui/react";
 import RoleService, { GetInboundRoles } from "../services/roleService";
 import AccordionList from "./AccordionList";
-import {
-  Path,
-  addPathToGraph,
-  getNodesFromPaths,
-} from "../services/pathService";
+import { Path, addPathToGraph } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
+import PathAccordionList from "./PathAccordionList";
 
 interface Props {
   node: Node;
@@ -18,15 +15,6 @@ const RoleOverviewPanel = ({ node }: Props) => {
   const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
   const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
   const { addNode, addEdge } = useApemanGraph();
-
-  function graphRolePath(n: Node) {
-    // Get Path for node
-    console.log(`Node id: ${n.id}`);
-    const path = inboundPaths.filter((path) => path.Nodes[0].id == n.id)[0];
-    console.log("PATH");
-    console.log(path);
-    addPathToGraph(path, addNode, addEdge);
-  }
 
   useEffect(() => {
     setAttachedPolicies([]);
@@ -78,13 +66,14 @@ const RoleOverviewPanel = ({ node }: Props) => {
         </Tbody>
       </Table>
       <Accordion allowMultiple={true} width="100%">
-        <AccordionList
-          nodes={getNodesFromPaths(inboundPaths)}
+        <PathAccordionList
+          paths={inboundPaths}
           name="Inbound Principals"
-          pathFunction={(n: Node) => {
-            graphRolePath(n);
+          pathFunction={(n: Path) => {
+            addPathToGraph(n, addNode, addEdge);
           }}
-        ></AccordionList>
+          pathLabelFunction={(n: Path) => n.Nodes[0].properties.map.arn}
+        ></PathAccordionList>
       </Accordion>
       <Accordion allowMultiple={true} width="100%">
         <AccordionList

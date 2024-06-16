@@ -2,8 +2,11 @@ package queries
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/hotnops/apeman/analyze"
 	"github.com/hotnops/apeman/graphschema/aws"
@@ -147,59 +150,330 @@ func GetActiveAWSConditionKeys(ctx context.Context, db graph.Database) (graph.No
 	return nodes, nil
 }
 
-func GetAWSResourceInboundPermissions(ctx context.Context, db graph.Database, arn string) ([]PermissionMapping, error) {
-	principalToStatementMap, err := analyze.GetAWSResourceInboundPermissions(ctx, db, arn)
+func MergePaths(firstPath graph.Path, secondPath graph.Path) (graph.Path, error) {
+	mergedPath := graph.Path{}
+	mergedPath.Nodes = append(firstPath.Nodes, secondPath.Nodes...)
+	mergedPath.Edges = append(firstPath.Edges, secondPath.Edges...)
+	return mergedPath, nil
+}
+
+func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database, roleId string) (*analyze.ActionPathSet, error) {
+	query := "MATCH p=(a:AWSRole) <- [:AttachedTo] - (:AWSAssumeRolePolicy) <- [:AttachedTo] - (s:AWSStatement) - [r:Resource|ExpandsTo*1..2] -> (:AWSRole|AWSUser) WHERE a.roleid = '%s' " +
+		"RETURN p"
+
+	formatted_query := fmt.Sprintf(query, roleId)
+
+	resourcePaths := graph.NewPathSet()
+
+	targetNode, err := GetAWSNodeByKindID(ctx, db, "roleid", roleId, aws.AWSRole)
 	if err != nil {
 		return nil, err
 	}
-	principalToActionMap := make([]PermissionMapping, 0)
 
-	// We have all the statments that can effectively act on the
-	// principal, but now we need to filter out conditions and deny statements
-	for id, statements := range principalToStatementMap {
-		if node, err := GetAWSNodeByGraphID(ctx, db, id); err != nil {
+	arn, _ := targetNode.Properties.Get("arn").String()
+	pathSet, _ := CypherQuery(ctx, db, formatted_query)
+
+	statements := pathSet.AllNodes().ContainingNodeKinds(aws.AWSStatement)
+	for _, statement := range statements {
+
+		// Get the actions for the statement
+		action_query := "MATCH p=(s:AWSStatement) - [:Action|ExpandsTo*1..2] -> (:AWSAction) WHERE ID(s) = %d RETURN p"
+		formatted_query := fmt.Sprintf(action_query, statement.ID)
+		actionPaths, _ := CypherQuery(ctx, db, formatted_query)
+
+		condition_query := "MATCH p=(s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = %d RETURN p"
+		formatted_query = fmt.Sprintf(condition_query, statement.ID)
+		conditionPaths, err := CypherQuery(ctx, db, formatted_query)
+		if err != nil {
 			return nil, err
-		} else {
-			permissionMapping := new(PermissionMapping)
-			permissionMapping.Arn, _ = node.Properties.Get("arn").String()
-			allowActions := make(map[string][]graph.ID)
-			denyActions := make(map[string][]graph.ID)
-			for _, statement := range statements {
-				if statement.Effect == "Allow" {
-					for _, action := range statement.Actions {
-						if statementList, ok := allowActions[action]; !ok {
-							allowActions[action] = []graph.ID{statement.StatementID}
-						} else {
-							allowActions[action] = append(statementList, statement.StatementID)
-						}
-					}
-				}
-				if statement.Effect == "Deny" {
-					for _, action := range statement.Actions {
-						if statementList, ok := allowActions[action]; !ok {
-							denyActions[action] = []graph.ID{statement.StatementID}
-						} else {
-							denyActions[action] = append(statementList, statement.StatementID)
-						}
-					}
-				}
+		}
 
-			}
-			for denyAction := range denyActions {
-				delete(allowActions, denyAction)
-			}
-			permissionMapping.Actions = allowActions
-			if len(allowActions) > 0 {
-				principalToActionMap = append(principalToActionMap, *permissionMapping)
-			}
+		pathsWithStatement := GetPathsWithStatement(pathSet, statement)
+
+		enrichedPath := graph.Path{}
+		for _, actionPath := range actionPaths {
+			enrichedPath, _ = MergePaths(actionPath, enrichedPath)
+		}
+		for _, conditionPath := range conditionPaths {
+			enrichedPath, _ = MergePaths(conditionPath, enrichedPath)
+		}
+
+		for _, path := range pathsWithStatement {
+			fullPath, _ := MergePaths(path, enrichedPath)
+			resourcePaths.AddPath(fullPath)
 		}
 	}
 
-	return principalToActionMap, nil
+	resourceActionPathSet := analyze.ResourcePolicyPathToActionPathSet(resourcePaths)
+	principalArns := resourceActionPathSet.GetPrincipals()
+
+	identityPaths := graph.NewPathSet()
+	uniqueActions := resourcePaths.AllNodes().ContainingNodeKinds(aws.AWSAction)
+	if len(principalArns) > 0 {
+		for _, action := range uniqueActions {
+			// For each action, get the identity policy permissions
+			// and then get the union of these paths and the resolved paths
+			actionName, err := action.Properties.Get("name").String()
+			if err != nil {
+				log.Printf("[!] Error getting action name: %s", err.Error())
+				continue
+			}
+			actionPaths, err := GetIdentityPolicyPathsOnArnWithAction(ctx, db, arn, actionName, principalArns)
+			if err != nil {
+				log.Printf("[!] Error getting identity policy permissions: %s", err.Error())
+				continue
+			}
+			identityPaths.AddPathSet(actionPaths)
+		}
+	}
+
+	identityActionPathSet := analyze.IdentityPolicyPathToActionPathSet(identityPaths)
+
+	// Get the intersection of the two path sets. Unlike most resource policies,
+	// which are unions, assume role policy must be an intersection.
+	allowedPaths, err := analyze.ActionPathSetIntersection(resourceActionPathSet, identityActionPathSet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now filter out identity based paths
+	// For each path, check the identity policy allows the action
+
+	// Get the intersection of the resolved paths and the identity paths
+	return allowedPaths, nil
 }
 
-func GetAWSResourceInboundPrincipalsWithAction(ctx context.Context, db graph.Database, targetArn string, action string) (map[graph.ID][]analyze.AWSStatementActions, error) {
-	return analyze.GetAWSResourceInboundPrincipalsWithAction(ctx, db, targetArn, action)
+func CreateAssumeRoleEdge(ctx context.Context, db graph.Database, sourceNodes []graph.ID, targetNode graph.ID) error {
+
+	return db.WriteTransaction(ctx, func(tx graph.Transaction) error {
+		for _, sourceNode := range sourceNodes {
+			properties := graph.NewProperties()
+			properties.Set("layer", 3)
+			properties.Set("name", "sts:AssumeRole")
+			_, err := tx.CreateRelationshipByIDs(sourceNode, targetNode, aws.IdentityTransform, properties)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func CreateAssumeRoleEdgesToRole(ctx context.Context, db graph.Database, roleNode *graph.Node, counter *Counter) {
+	roleId, _ := roleNode.Properties.Get("roleid").String()
+	rolePaths, err := GetAWSRoleInboundRoleAssumptionPaths(ctx, db, roleId)
+	if err != nil {
+		log.Printf("[!] Error getting role assumption paths: %s", err.Error())
+	}
+
+	if len(rolePaths.ActionPaths) > 0 {
+		sourceIDs := make([]graph.ID, 0)
+		for _, actionPath := range rolePaths.ActionPaths {
+			sourceIDs = append(sourceIDs, actionPath.PrincipalID)
+		}
+		err := CreateAssumeRoleEdge(ctx, db, sourceIDs, roleNode.ID)
+		if err != nil {
+			log.Printf("[!] Error creating assume role edge: %s", err.Error())
+		}
+
+	}
+
+	// Update and log progress
+	processedCount := counter.Increment()
+	if (processedCount % 100) == 0 {
+		log.Printf("Processed %d out of %d", processedCount, counter.Total)
+	}
+
+}
+
+type Counter struct {
+	mu    sync.Mutex
+	count int
+	Total int
+}
+
+// Increment safely increments the counter and returns the new count
+func (c *Counter) Increment() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.count++
+	return c.count
+}
+
+func CreateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
+	roleNodes := graph.NewNodeSet()
+	db.ReadTransaction(ctx, func(tx graph.Transaction) error {
+		if fetchedNodes, err := ops.FetchNodeSet(tx.Nodes().Filterf(func() graph.Criteria {
+			return query.And(query.Kind(query.Node(), aws.AWSRole))
+		})); err != nil {
+			return err
+		} else {
+			for _, fetchedNode := range fetchedNodes {
+				roleNodes.Add(fetchedNode)
+			}
+			return nil
+		}
+	})
+
+	const numWorkers = 1000
+	jobs := make(chan *graph.Node, len(roleNodes.Slice()))
+	var wg sync.WaitGroup
+
+	// Initialize the counter
+	counter := &Counter{Total: len(roleNodes.Slice())}
+
+	// Start worker goroutines
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for roleNode := range jobs {
+				CreateAssumeRoleEdgesToRole(ctx, db, roleNode, counter)
+			}
+		}()
+	}
+
+	// Distribute jobs
+	for _, roleNode := range roleNodes.Slice() {
+		jobs <- roleNode
+	}
+	close(jobs)
+
+	// Wait for all workers to finish
+	wg.Wait()
+	log.Println("All jobs processed")
+	return nil
+}
+
+func GetIdentityPolicyPathsOnArnWithAction(ctx context.Context, db graph.Database, arn string, actionName string, principalArns []string) (graph.PathSet, error) {
+
+	var formattedItems strings.Builder
+	for i, item := range principalArns {
+		formattedItems.WriteString(fmt.Sprintf("'%s'", item))
+		if i < len(principalArns)-1 {
+			formattedItems.WriteString(", ")
+		}
+	}
+
+	query := "MATCH (b:AWSRole) WHERE b.arn CONTAINS '%s' " +
+		"MATCH (a:AWSUser|AWSRole) WHERE a.arn IN [%s] " +
+		"OPTIONAL MATCH p1=(a) <- [:AttachedTo*3..4] - (s1:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s1) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: '%s'}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"OPTIONAL MATCH p2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s2:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s2) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"WITH collect(p1) + collect(p2) AS paths, collect(s1) + collect(s2) as statements, b, a WHERE paths IS NOT NULL " +
+		"UNWIND statements as s " +
+		"OPTIONAL MATCH pa1=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: '%s'}) WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"OPTIONAL MATCH pa2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: '%s'}) WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"WITH collect(pa1) + collect(pa2) AS prinToAction WHERE prinToAction IS NOT NULL " +
+		"UNWIND(prinToAction) as p " +
+		"RETURN p"
+
+	formatted_query := fmt.Sprintf(query, arn, formattedItems.String(), actionName, actionName, actionName)
+
+	pathSet, err := CypherQuery(ctx, db, formatted_query)
+	if err != nil {
+		return nil, err
+	}
+
+	return pathSet, nil
+}
+
+func GetResourcePathFromStatementToArn(ctx context.Context, db graph.Database, statementID graph.ID, arn string) (graph.PathSet, error) {
+	query := "MATCH rp=(s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b:UniqueArn) WHERE ID(s) = %d AND b.arn = '%s' RETURN rp"
+	formatted_query := fmt.Sprintf(query, statementID, arn)
+
+	pathSet, err := CypherQuery(ctx, db, formatted_query)
+	if err != nil {
+		return nil, err
+	}
+	return pathSet, nil
+}
+
+func GetConditionPathFromStatement(ctx context.Context, db graph.Database, statementID graph.ID) (graph.PathSet, error) {
+	query := "MATCH cp=(s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = %d RETURN cp"
+	formatted_query := fmt.Sprintf(query, statementID)
+
+	pathSet, err := CypherQuery(ctx, db, formatted_query)
+	if err != nil {
+		return nil, err
+	}
+	return pathSet, nil
+}
+
+func GetPathsWithStatement(paths graph.PathSet, statement *graph.Node) graph.PathSet {
+	pathsWithStatement := graph.NewPathSet()
+	for _, path := range paths {
+		if path.ContainsNode(statement.ID) {
+			pathsWithStatement.AddPath(path)
+		}
+	}
+	return pathsWithStatement
+}
+
+func GetAllIdentityPolicyPathsOnArn(ctx context.Context, db graph.Database, arn string) (graph.PathSet, error) {
+
+	query := "MATCH (b:AWSRole) WHERE b.arn CONTAINS '%s' " +
+		"MATCH (a:AWSUser|AWSRole) WHERE a.account_id = b.account_id " +
+		"OPTIONAL MATCH p1=(a) <- [:AttachedTo*3..4] - (s1:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s1) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"OPTIONAL MATCH p2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s2:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s2) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"WITH collect(p1) + collect(p2) AS paths, collect(s1) + collect(s2) as statements, b, a WHERE paths IS NOT NULL " +
+		"UNWIND statements as s " +
+		"OPTIONAL MATCH pa1=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction) WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"OPTIONAL MATCH pa2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction) WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
+		"WITH collect(pa1) + collect(pa2) AS prinToAction WHERE prinToAction IS NOT NULL " +
+		"UNWIND(prinToAction) as p " +
+		"RETURN p"
+
+	formatted_query := fmt.Sprintf(query, arn)
+
+	pathSet, err := CypherQuery(ctx, db, formatted_query)
+	if err != nil {
+		return nil, err
+	}
+
+	fullPaths := graph.NewPathSet()
+
+	statements := pathSet.AllNodes().ContainingNodeKinds(aws.AWSStatement)
+	for _, statement := range statements {
+		// Get the resource path
+		resourcePaths, err := GetResourcePathFromStatementToArn(ctx, db, statement.ID, arn)
+		if err != nil {
+			log.Printf("[!] Error getting resource path: %s", err.Error())
+			continue
+		}
+		conditionPaths, err := GetConditionPathFromStatement(ctx, db, statement.ID)
+		if err != nil {
+			log.Printf("[!] Error getting condition path: %s", err.Error())
+			continue
+		}
+
+		pathsWithStatement := GetPathsWithStatement(pathSet, statement)
+
+		enrichedPath := graph.Path{}
+		for _, resourcePath := range resourcePaths {
+			enrichedPath, _ = MergePaths(resourcePath, enrichedPath)
+		}
+		for _, conditionPath := range conditionPaths {
+			enrichedPath, _ = MergePaths(conditionPath, enrichedPath)
+		}
+
+		for _, path := range pathsWithStatement {
+			fullPath, _ := MergePaths(path, enrichedPath)
+			fullPaths.AddPath(fullPath)
+		}
+
+	}
+
+	resolvedPaths, err := analyze.ResolvePaths(fullPaths)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolvedPaths, nil
+
+}
+
+func GetAWSResourceInboundPrincipalsWithAction(ctx context.Context, db graph.Database, targetArn string, action string) (graph.PathSet, error) {
+	return analyze.GetAWSIdentityPolicyPermissions(ctx, db, targetArn, action)
 }
 
 func GetAWSNodeByKindID(ctx context.Context, db graph.Database, propertyName string, id string, kind graph.Kind) (*graph.Node, error) {
@@ -220,18 +494,6 @@ func GetAWSNodeByKindID(ctx context.Context, db graph.Database, propertyName str
 	})
 
 	return nodes.Slice()[0], nil
-}
-
-func GetAWSNodeByGraphID(ctx context.Context, db graph.Database, id graph.ID) (*graph.Node, error) {
-	var node *graph.Node
-	var err error
-
-	err = db.ReadTransaction(ctx, func(tx graph.Transaction) error {
-		node, err = ops.FetchNode(tx, id)
-		return nil
-	})
-
-	return node, err
 }
 
 func GetAWSRelationshipByGraphID(ctx context.Context, db graph.Database, id graph.ID) (*graph.Relationship, error) {

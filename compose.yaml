@@ -14,7 +14,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   neo4j:
-    image: neo4j
+    image: neo4j:latest
     ports:
       - "7687:7687"
       - "7474:7474"
@@ -22,10 +22,14 @@ services:
       - "./graph_data:/data"
       - "./import:/import"
     environment:
-      - NEO4JLABS_PLUGINS=["apoc"]
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - NEO4J_apoc_export_file_enabled=true
       - NEO4J_AUTH=none
-      - NEO4J_server_memory_heap_initial__size=6G
-      - NEO4J_server_memory_heap_max__size=16G
+      - NEO4J_server_memory_heap_initial__size=8G
+      - NEO4J_server_memory_heap_max__size=10G
       - NEO4J_server_memory_pagecache_size=4G
 
 

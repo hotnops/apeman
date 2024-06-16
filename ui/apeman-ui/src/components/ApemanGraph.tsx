@@ -79,16 +79,29 @@ const ApemanGraph = () => {
       "id" in activeElement ? activeElement.id : activeElement.ID;
   }
 
+  const canvasOptions = {
+    antialias: true,
+    preserveDrawingBuffer: false,
+    depth: true,
+    stencil: false,
+    alpha: true,
+    premultipliedAlpha: true,
+    failIfMajorPerformanceCaveat: true,
+    powerPreference: "high-performance",
+    desynchronized: false,
+  };
+
   return (
     <GraphCanvas
       ref={graphRef}
       nodes={nodes}
       edges={edges}
+      glOptions={canvasOptions}
       edgeLabelPosition="inline"
       edgeInterpolation="linear"
       labelType="all"
       theme={theme}
-      layoutType="forceDirected2d"
+      layoutType="treeTd2d"
       selections={activeElementId ? [activeElementId.toString()] : []}
       onCanvasClick={() => {
         setActiveElement(null);

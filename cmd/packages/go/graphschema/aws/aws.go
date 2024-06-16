@@ -20,7 +20,6 @@
 package aws
 
 import (
-	"errors"
 	graph "github.com/specterops/bloodhound/dawgs/graph"
 )
 
@@ -48,13 +47,15 @@ var (
 	AWSResourceType = graph.StringKind("AWSResourceType")
 	
 	ActsOn = graph.StringKind("ActsOn")
-	AllowAction = graph.StringKind("AllowAction")
-	DenyAction = graph.StringKind("DenyAction")
+	AllowAction = graph.StringKind("Action")
+	NotAction = graph.StringKind("NotAction")
 	AttachedTo = graph.StringKind("AttachedTo")
 	ExpandsTo = graph.StringKind("ExpandsTo")
-	OnResource = graph.StringKind("OnResource")
+	Resource = graph.StringKind("Resource")
+	NotResource = graph.StringKind("NotResource")
 	MemberOf = graph.StringKind("MemberOf")
 	TypeOf = graph.StringKind("TypeOf")
+	IdentityTransform = graph.StringKind("IdentityTransform")
 
 )
 
@@ -73,67 +74,3 @@ const (
 	RoleName				Property = "rolename"
 	UpdateDate				Property = "updatedate"
 )
-
-func AllProperties() []Property {
-	return []Property{CreateDate, Path, RoleId, RoleName}
-}
-func ParseProperty(source string) (Property, error) {
-	switch source {
-	case "createdate":
-		return CreateDate, nil
-	case "path":
-		return Path, nil
-	case "roleid":
-		return RoleId, nil
-	case "rolename":
-		return RoleName, nil
-	default:
-		return "", errors.New("Invalid enumeration value: " + source)
-	}
-}
-func (s Property) String() string {
-	switch s {
-	case CreateDate:
-		return string(CreateDate)
-	case Path:
-		return string(Path)
-	case RoleId:
-		return string(RoleId)
-	case RoleName:
-		return string(RoleName)
-	default:
-		panic("Invalid enumeration case: " + string(s))
-	}
-}
-func (s Property) Name() string {
-	switch s {
-	case CreateDate:
-		return "Create Date"
-	case Path:
-		return "Path"
-	case RoleId:
-		return "Role ID"
-	case RoleName:
-		return "Role Name"
-	default:
-		panic("Invalid enumeration case: " + string(s))
-	}
-}
-func (s Property) Is(others ...graph.Kind) bool {
-	for _, other := range others {
-		if value, err := ParseProperty(other.String()); err == nil && value == s {
-			return true
-		}
-	}
-	return false
-}
-func Nodes() []graph.Kind {
-	return []graph.Kind{AWSEntity, AWSUser, AWSRole, AWSManagedPolicy}
-}
-func Relationships() []graph.Kind {
-	return []graph.Kind{AttachedTo, ExpandsTo, OnResource, MemberOf}
-}
-
-func PathfindingRelationships() []graph.Kind {
-	return []graph.Kind{AttachedTo, ExpandsTo, OnResource, MemberOf}
-}

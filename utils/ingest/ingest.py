@@ -5,6 +5,7 @@ import glob
 import json
 import neo4j
 import os
+import re
 import shutil
 import sys
 import xxhash
@@ -36,19 +37,23 @@ condition_key_to_condition_rels = {}
 operator_to_condition_rels = {}
 multi_operator_to_condition_rels = {}
 condition_value_to_condition_rels = {}
-allow_action_to_statement_rels = {}
-deny_action_to_statement_rels = {}
+statement_to_action_rels = {}
+statement_to_not_action_rels = {}
 statement_to_resource_rels = {}
+statement_to_not_resource_rels = {}
 statement_to_resource_blob_rels = {}
-statement_to_allow_action_blob_rels = {}
-statement_to_deny_action_blob_rels = {}
-
+statement_to_not_resource_blob_rels = {}
+statement_to_action_blob_rels = {}
+statement_to_not_action_blob_rels = {}
+condition_key_to_resource_rels = {}
 
 def get_hash(item_to_hash: dict):
     return xxhash.xxh128_hexdigest(json.dumps(item_to_hash, sort_keys=True))
 
 
 def process_condition_value(condition_value):
+    if not condition_value:
+        condition_value = ""
     if condition_value not in condition_value_map:
         condition_value_map[condition_value] = {'name': condition_value}
 
@@ -108,6 +113,8 @@ def process_condition(operator: str, condition_keyvalue: dict):
             condition_values = [condition_values]
 
         for condition_value in condition_values:
+            if not condition_value:
+                condition_value = "empty"
             process_condition_value(condition_value)
             # Condition value to condition
             add_to_rels(condition_value_to_condition_rels, condition_value,
@@ -120,29 +127,64 @@ def neo4j_escape_regex(unescaped_string: str):
     unescaped_string = unescaped_string.replace(".", "\\.")
     unescaped_string = unescaped_string.replace("*", ".*")
     unescaped_string = unescaped_string.replace("?", "\\?")
-    unescaped_string = unescaped_string.replace("[", "\\[]")
+    unescaped_string = unescaped_string.replace("[", "\\[")
     return unescaped_string
 
+def has_policy_variable(resource: str):
+    if "${" in resource:
+        return True
+    
+def extract_policy_variables(input_string: str):
+    # Define the pattern to match the values between ${ and }
+    pattern = r'\$\{(.*?)\}'
+    
+    # Find all occurrences of the pattern in the input string
+    matches = re.findall(pattern, input_string)
+    
+    return matches
 
-def process_resources(statement_hash, resources: list):
+def replace_policy_var_with_wildcard(input_string: str):
+    # Define the pattern to match the segment starting with ${ and ending with }
+    pattern = r'\$\{.*?\}'
+    
+    # Replace the matched pattern with an asterisk
+    result = re.sub(pattern, '*', input_string)
+    
+    return result
+
+def process_resources(statement_hash, resources: list, negated: bool):
     for resource in resources:
         regex = None
         is_root = False
+        policy_var = False        
+
+
         if arn.Arn.is_arn(resource):
             resource_arn = arn.Arn.fromstring(resource)
             if resource_arn.service == "iam" and resource_arn.resource == "root":
                 is_root = True
                 regex = f"arn:aws:iam::{resource_arn.account_id}:(user|group|role)/[^:]+"
+            policy_var = has_policy_variable(resource)
 
-        if "*" in resource or is_root:
+        if "*" in resource or is_root or policy_var:
             if resource not in resource_blob_map:
-                if "*" in resource:
+                if policy_var:
+                    vars = extract_policy_variables(resource)
+                    temp_resource = replace_policy_var_with_wildcard(resource)
+                    regex = neo4j_escape_regex(temp_resource)
+                    for var in vars:
+                        add_to_rels(condition_key_to_resource_rels, var, resource)
+                elif "*" in resource:
                     regex = neo4j_escape_regex(resource)
                 resource_blob_map[resource] = {
                     'name': resource,
                     'regex': regex
                 }
-            add_to_rels(statement_to_resource_blob_rels, statement_hash,
+            if negated:
+                add_to_rels(statement_to_not_resource_blob_rels, statement_hash,
+                            resource)
+            else:
+                add_to_rels(statement_to_resource_blob_rels, statement_hash,
                         resource)
         else:
             # Some statements will have a principal ID instead of
@@ -150,9 +192,47 @@ def process_resources(statement_hash, resources: list):
             # of a role that has been deleted.
             # See: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#principal-roles
             if arn.Arn.is_arn(resource):
-                add_to_rels(statement_to_resource_rels, statement_hash, resource)
+                if negated:
+                    add_to_rels(statement_to_not_resource_rels, statement_hash,
+                                resource)
+                else:
+                    add_to_rels(statement_to_resource_rels, statement_hash, resource)
             else:
                 print(f"[*] Invalid resource ARN: {resource}")
+
+def process_actions(actions: list, effect: str, statement_hash: str, negated: bool):
+    for action in actions:
+        action = action.lower()
+        if "*" in action:
+            # If a specific AWS action is not defined,
+            # we will create a new ActionBlob node that
+            # will link to all of the actions that it
+            # encompasses
+            if action not in action_blob_map:
+                action_blob_map[action] = {
+                    "name": action,
+                    "regex": neo4j_escape_regex(action)
+                }
+            
+            if negated:
+                add_to_rels(statement_to_not_action_blob_rels,
+                            statement_hash,
+                            action)
+            else:
+                add_to_rels(statement_to_action_blob_rels,
+                            statement_hash,
+                            action)             
+        else:
+            # Action directly specified in statement
+            if negated:
+                add_to_rels(statement_to_not_action_rels,
+                            statement_hash,
+                            action)
+            else:
+                add_to_rels(statement_to_action_rels,
+                            statement_hash,
+                            action)
+
 
 def process_statement(statement):
     statement_hash = get_hash(statement)
@@ -172,54 +252,34 @@ def process_statement(statement):
             add_to_rels(hash_to_hash_rels, condition_hash, statement_hash)
 
     actions = statement.get('Action', [])
+    notActions = statement.get('NotAction', [])
     if not type(actions) == list:
         actions = [actions]
+    if not type(notActions) == list:
+        notActions = [notActions]
 
-    for action in actions:
-        action = action.lower()
-        if "*" in action:
-            # If a specific AWS action is not defined,
-            # we will create a new ActionBlob node that
-            # will link to all of the actions that it
-            # encompasses
-            if action not in action_blob_map:
-                action_blob_map[action] = {
-                    "name": action,
-                    "regex": neo4j_escape_regex(action)
-                }
-            if effect == "Allow":
-                add_to_rels(statement_to_allow_action_blob_rels,
-                            statement_hash,
-                            action)
-            elif effect == "Deny":
-                add_to_rels(statement_to_deny_action_blob_rels,
-                            statement_hash,
-                            action)
-            else:
-                print(f"[!] Unsupported effect: {effect}")                
-        else:
-            # Action directly specified in statement
-            if effect == "Allow":
-                add_to_rels(allow_action_to_statement_rels,
-                            statement_hash,
-                            action)
-            elif effect == "Deny":
-                add_to_rels(deny_action_to_statement_rels,
-                            statement_hash,
-                            action)
-            else:
-                print(f"[!] Unsupported effect: {effect}")
+    process_actions(actions, effect, statement_hash, False)
+    process_actions(notActions, effect, statement_hash, True)
 
     resources = statement.get('Resource', [])
     if not type(resources) == list:
         resources = [resources]
+    notResources = statement.get('NotResource', [])
+    if not type(notResources) == list:
+        notResources = [notResources]
 
-    process_resources(statement_hash, resources)
-    # This is for statements in trust policies
+    process_resources(statement_hash, resources, False)
+    process_resources(statement_hash, notResources, True)
+    
+    # # This is for statements in trust policies
     principals = statement.get('Principal', {}).get("AWS", [])
+    # notPrincipals = statement.get('NotPrincipal', {}).get("AWS", [])
     if not type(principals) == list:
         principals = [principals]
-    process_resources(statement_hash, principals)
+    # if not type(notPrincipals) == list:
+    #     notPrincipals = [notPrincipals]
+    process_resources(statement_hash, principals, False)
+    # process_resources(statement_hash, notPrincipals, True)
 
     return statement_hash
 
@@ -342,7 +402,8 @@ def process_user(user):
     process_tags(user)
     process_principal_policies(user)
     for group_name in user["GroupList"]:
-        add_to_rels(member_of_rels, user_arn, group_name)
+        group_arn = get_arn_from_groupname(group_name, user_arn)
+        add_to_rels(member_of_rels, user_arn, group_arn)
 
 
 def process_role(role):
@@ -359,6 +420,11 @@ def process_role(role):
     tp_hash = process_trust_policy(role['AssumeRolePolicyDocument'])
     add_to_rels(hash_to_arn_rels, tp_hash, role_arn)
 
+def get_arn_from_groupname(groupname: str, arn: arn.Arn):
+    account_number = arn.account_id
+    for group in group_map.values():
+        if group['GroupName'] == groupname:
+            return group['Arn']
 
 def process_group(group):
     group_arn = arn.Arn.fromstring(group['Arn'])
@@ -391,7 +457,7 @@ def write_to_csv(filename, items, field_names):
         writer.writerows(lowercase_items)
 
 
-def json_to_csv(json_text, output_dir):
+def parse_json(json_text):
     auth_dictionary = json.loads(json_text)
     groups = auth_dictionary["GroupDetailList"]
     users = auth_dictionary["UserDetailList"]
@@ -407,12 +473,343 @@ def json_to_csv(json_text, output_dir):
     for role in roles:
         process_role(role)
 
-    for user in users:
-        process_user(user)
-
     for group in groups:
         process_group(group)
 
+    for user in users:
+        process_user(user)
+
+    
+
+
+def ingest_csv(session, filename, datatype, fields):
+    print(f"[*] Processing csv {filename}")
+    query = (
+        f'LOAD CSV FROM "file:///{filename}" AS row '
+    )
+
+    query += "WITH "
+
+    delimiter = ", "
+    field_names = []
+    for i in range(len(fields)):
+        field_names.append(f"row[{i}] AS {fields[i]}")
+
+    query += delimiter.join(field_names)
+
+    query += (
+        f" MERGE (a:{datatype} {{{fields[0]}:{fields[0]}}}) "
+        "ON CREATE SET "
+    )
+
+    for field in fields:
+        query += f"a.{field} = {field}, "
+    query += "a.layer = 1 "
+
+    # If the node already exists, delete all properties
+    # end reset them
+    query += "ON MATCH SET a = {}, "
+    for field in fields:
+        query += f"a.{field} = {field}, "
+    query += "a.layer = 1 "
+    try:
+        session.run(query)
+    except Exception as e:
+        print(e)
+        import pdb; pdb.set_trace()
+
+
+def ingest_resources(session, filename):
+    print(f"[*] Processing csv {filename}")
+    query = (
+        f'LOAD CSV FROM "file:///{filename}" AS row '
+        'WITH row[0] AS arn '
+        'MERGE (a:UniqueArn {arn:arn}) '
+        'ON CREATE SET a.arn = arn, a.layer = 1 '
+    )
+
+    session.run(query)
+
+
+
+def ingest_relationships(session, filename, source_label, source_field,
+                         rel_name, dest_label, dest_field):
+    print(f"[*] Processing relationship: {filename}")
+    query = (
+        f'LOAD CSV FROM "file:///{filename}" AS row '
+        'CALL { '
+        'WITH row '
+        f'MERGE (s:{source_label} {{{source_field}: row[0]}}) '
+        f'ON CREATE SET s.inferred = true, s.layer = 1 '
+        f'MERGE (d:{dest_label} {{{dest_field}: row[1]}}) '
+        f'ON CREATE SET d.inferred = true, d.layer = 1 '
+        f'MERGE (s) - [:{rel_name} {{layer: 1}}] -> (d) '
+        '} IN TRANSACTIONS'
+    )
+    session.run(query)
+
+
+def load_csvs_into_database():
+    driver = GraphDatabase.driver("bolt://localhost:7687",
+                                  auth=("neo4j", "p@ssw0rd!"))
+
+    with driver.session() as session:
+        ingest_csv(session, "actionblobs.csv",
+                   "AWSActionBlob:UniqueName",
+                   ["name", "regex"])
+        ingest_csv(session, "assumerolepolicies.csv", "AWSAssumeRolePolicy:UniqueHash",
+                   ["hash", "version", "sid"])
+        ingest_csv(session, "conditions.csv", "AWSCondition:UniqueHash",
+                   ["hash", "sid"])
+        ingest_csv(session, "conditionvalues.csv", "AWSConditionValue:UniqueName",
+                   ["name"])
+        ingest_csv(session, "groups.csv", "AWSGroup:UniqueArn",
+                   ["arn", "path", "name", "groupid",
+                    "createdate"])
+        ingest_csv(session, "inlinepolicies.csv", "AWSInlinePolicy:UniqueHash",
+                   ["hash", "policyname"])
+
+        # The name AWSManagedPolicy is a misnomer because AWS Managed
+        # policy implies it is managed by AWS, but a managed policy
+        # is one that gets its own ARN. To fit with the naming scheme,
+        # we are keeping AWSManagedPolicy
+        ingest_csv(session, "managedpolicies.csv", "AWSManagedPolicy:UniqueArn",
+                   ["policyname", "policyid", "arn", "path",
+                    "defaultversionid", "attachmentcount",
+                    "permissionsboundaryusagecount",
+                    "isattachable", "createdate", "updatedate"])
+        ingest_csv(session, "policydocuments.csv", "AWSPolicyDocument:UniqueHash",
+                   ["hash", "version"])
+        ingest_csv(session, "policyversions.csv", "AWSPolicyVersion:UniqueHash",
+                   ["hash", "versionid", "isdefaultversion"])
+        ingest_csv(session, "roles.csv", "AWSRole:UniqueArn",
+                   ["arn", "path", "rolename", "roleid", "createdate",
+                    "rolelastused"])
+        ingest_csv(session, "statements.csv", "AWSStatement:UniqueHash",
+                   ["hash", "effect", "sid"])
+        ingest_csv(session, "users.csv", "AWSUser:UniqueArn",
+                   ["arn", "path", "name", "userid",
+                    "createdate"])
+        ingest_csv(session, "resourceblobs.csv", "AWSResourceBlob:UniqueName",
+                   ['name', 'regex'])
+        ingest_csv(session, "tags.csv", "AWSTag:UniqueHash",
+                   ['hash', 'key', 'value'])
+        ingest_relationships(session, "hash_to_hash_rels.csv", "UniqueHash",
+                             "hash", "AttachedTo", "UniqueHash", "hash")
+        ingest_relationships(session, "hash_to_arn_rels.csv", "UniqueHash",
+                             "hash", "AttachedTo", "UniqueArn", "arn")
+        ingest_relationships(session, "arn_to_arn_rels.csv", "UniqueArn",
+                             "arn", "AttachedTo", "UniqueArn", "arn")
+        ingest_relationships(session, "member_of_rels.csv", "AWSUser", "arn",
+                             "MemberOf", "AWSGroup", "arn")
+        ingest_relationships(session, "condition_key_to_condition_rels.csv",
+                             "AWSConditionKey:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSCondition:UniqueHash", "hash")
+        ingest_relationships(session, "condition_value_to_condition_rels.csv",
+                             "AWSConditionValue:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSCondition:UniqueHash", "hash")
+        ingest_relationships(session, "operator_to_condition_rels.csv",
+                             "AWSOperator:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSCondition:UniqueHash", "hash")
+        ingest_relationships(session, "multi_operator_to_condition_rels.csv",
+                             "AWSOperator:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSCondition:UniqueHash", "hash")
+        ingest_relationships(session, "statement_to_action_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "Action",
+                             "AWSAction:UniqueName", "name")
+        ingest_relationships(session, "statement_to_not_action_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotAction",
+                             "AWSAction:UniqueName", "name")
+        ingest_relationships(session, "statement_to_action_blob_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "Action",
+                             "AWSActionBlob:UniqueName", "name")
+        ingest_relationships(session, "statement_to_not_action_blob_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotAction",
+                             "AWSActionBlob:UniqueName", "name")
+        ingest_relationships(session, "statement_to_resource_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "Resource",
+                             "UniqueArn", "arn")
+        ingest_relationships(session, "statement_to_not_resource_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotResource",
+                             "UniqueArn", "arn")
+        ingest_relationships(session, "statement_to_resource_blob_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "Resource",
+                             "AWSResourceBlob:UniqueName", "name")
+        ingest_relationships(session, "statement_to_not_resource_blob_rels.csv",
+                             "AWSStatement:UniqueHash", "hash",
+                             "NotResource",
+                             "AWSResourceBlob:UniqueName", "name")
+        ingest_relationships(session, "condition_key_to_resource_rels.csv",
+                             "AWSConditionKey:UniqueName", "name",
+                             "AttachedTo",
+                             "AWSResourceBlob:UniqueName", "name")
+                             
+        try:
+            ingest_resources(session, "arns.csv")
+        except neo4j.exceptions.ClientError:
+            pass
+
+
+def rels_to_unique_list(rels):
+    return_list = []
+    for key, values in rels.items():
+        for value in values:
+            return_list.append(
+                {'source': key,
+                 'dest': value})
+
+    return return_list
+
+
+def write_rels_to_csv(outputdir):
+    fields = ['source', 'dest']
+    hash_to_hash_filename = os.path.join(outputdir, "hash_to_hash_rels.csv")
+    hash_to_arn_filename = os.path.join(outputdir, "hash_to_arn_rels.csv")
+    arn_to_arn_rels_filename = os.path.join(outputdir, "arn_to_arn_rels.csv")
+    member_of_rels_filename = os.path.join(outputdir, "member_of_rels.csv")
+    ck_to_condition_rels_filename = os.path.join(
+        outputdir,
+        "condition_key_to_condition_rels.csv")
+
+    operator_to_condition_rels_filename = os.path.join(
+        outputdir,
+        "operator_to_condition_rels.csv")
+    multi_operator_to_condition_rels_filename = os.path.join(
+        output_dir,
+        "multi_operator_to_condition_rels.csv"
+    )
+    condition_value_to_condition_rels_filename = os.path.join(
+        outputdir,
+        "condition_value_to_condition_rels.csv"
+    )
+    statement_to_action_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_action_rels.csv"
+    )
+    statement_to_not_action_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_action_rels.csv"
+    )
+    statement_to_resource_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_resource_rels.csv"
+    )
+    statement_to_not_resource_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_resource_rels.csv"
+    )
+    statement_to_resource_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_resource_blob_rels.csv"
+    )
+    statement_to_not_resource_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_resource_blob_rels.csv"
+    )
+
+    statement_to_action_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_action_blob_rels.csv"
+    )
+
+    statement_to_not_action_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_not_action_blob_rels.csv"
+    )
+
+    condition_key_to_resource_rels_filename = os.path.join(
+        outputdir,
+        "condition_key_to_resource_rels.csv"
+    )
+
+    write_to_csv(hash_to_hash_filename,
+                 rels_to_unique_list(hash_to_hash_rels), fields)
+    write_to_csv(hash_to_arn_filename,
+                 rels_to_unique_list(hash_to_arn_rels), fields)
+    write_to_csv(arn_to_arn_rels_filename,
+                 rels_to_unique_list(arn_to_arn_rels), fields)
+    write_to_csv(member_of_rels_filename,
+                 rels_to_unique_list(member_of_rels), fields)
+    write_to_csv(ck_to_condition_rels_filename,
+                 rels_to_unique_list(condition_key_to_condition_rels),
+                 fields)
+    write_to_csv(operator_to_condition_rels_filename,
+                 rels_to_unique_list(operator_to_condition_rels),
+                 fields)
+    write_to_csv(multi_operator_to_condition_rels_filename,
+                 rels_to_unique_list(multi_operator_to_condition_rels),
+                 fields)
+    write_to_csv(condition_value_to_condition_rels_filename,
+                 rels_to_unique_list(condition_value_to_condition_rels),
+                 fields)
+    write_to_csv(statement_to_action_rels_filename,
+                 rels_to_unique_list(statement_to_action_rels),
+                 fields)
+    write_to_csv(statement_to_not_action_rels_filename,
+                 rels_to_unique_list(statement_to_not_action_rels),
+                 fields)
+    write_to_csv(statement_to_resource_rels_filename,
+                 rels_to_unique_list(statement_to_resource_rels),
+                 fields)
+    write_to_csv(statement_to_not_resource_rels_filename,
+                 rels_to_unique_list(statement_to_not_resource_rels),
+                 fields)
+    write_to_csv(statement_to_resource_blob_rels_filename,
+                 rels_to_unique_list(statement_to_resource_blob_rels),
+                 fields)
+    write_to_csv(statement_to_not_resource_blob_rels_filename,
+                 rels_to_unique_list(statement_to_not_resource_blob_rels),
+                 fields)
+    write_to_csv(statement_to_action_blob_rels_filename,
+                 rels_to_unique_list(statement_to_action_blob_rels),
+                 fields)
+    write_to_csv(statement_to_not_action_blob_rels_filename,
+                 rels_to_unique_list(statement_to_not_action_blob_rels),
+                 fields)
+    write_to_csv(condition_key_to_resource_rels_filename,
+                 rels_to_unique_list(condition_key_to_resource_rels),
+                 fields)
+
+
+def delete_layer_1():
+    print("[*] Deleting layer 1")
+    driver = GraphDatabase.driver("bolt://localhost:7687",
+                                  auth=("bloodhound", "bloodhound"))
+    with driver.session() as session:
+        for i in [2, 1]:
+            session.run(
+                f"MATCH () - [r {{layer:{i}}}] - () "
+                "DETACH DELETE r"
+            )
+
+            session.run(
+                f"MATCH (n {{layer: {i}}}) "
+                "DELETE n"
+            )
+
+            session.run(
+                "MATCH (n) - [r] - () WHERE n.layer IS NULL "
+                "DETACH DELETE r"
+            )
+
+            session.run(
+                "MATCH (n) WHERE n.layer IS NULL "
+                "DELETE n"
+            )
+
+
+def write_nodes_to_csv(output_dir: str):
     managed_policies_filename = os.path.join(output_dir,
                                              "managedpolicies.csv")
 
@@ -480,288 +877,6 @@ def json_to_csv(json_text, output_dir):
     write_to_csv(tags_filename, tag_map, ["hash", "key", "value"])
 
 
-def ingest_csv(session, filename, datatype, fields):
-    print(f"[*] Processing csv {filename}")
-    query = (
-        f'LOAD CSV FROM "file:///{filename}" AS row '
-    )
-
-    query += "WITH "
-
-    delimiter = ", "
-    field_names = []
-    for i in range(len(fields)):
-        field_names.append(f"row[{i}] AS {fields[i]}")
-
-    query += delimiter.join(field_names)
-
-    query += (
-        f" MERGE (a:{datatype} {{{fields[0]}:{fields[0]}}}) "
-        "ON CREATE SET "
-    )
-
-    for field in fields:
-        query += f"a.{field} = {field}, "
-    query += "a.layer = 1 "
-
-    # If the node already exists, delete all properties
-    # end reset them
-    query += "ON MATCH SET a = {}, "
-    for field in fields:
-        query += f"a.{field} = {field}, "
-    query += "a.layer = 1 "
-
-    session.run(query)
-
-
-def ingest_resources(session, filename):
-    print(f"[*] Processing csv {filename}")
-    query = (
-        f'LOAD CSV FROM "file:///{filename}" AS row '
-        'WITH row[0] AS arn '
-        'MERGE (a:UniqueArn {arn:arn}) '
-        'ON CREATE SET a.arn = arn, a.layer = 1 '
-    )
-
-    session.run(query)
-
-
-
-def ingest_relationships(session, filename, source_label, source_field,
-                         rel_name, dest_label, dest_field):
-    print(f"[*] Processing relationship: {filename}")
-    query = (
-        f'LOAD CSV FROM "file:///{filename}" AS row '
-        'CALL { '
-        'WITH row '
-        f'MERGE (s:{source_label} {{{source_field}: row[0]}}) '
-        f'ON CREATE SET s.inferred = true '
-        f'MERGE (d:{dest_label} {{{dest_field}: row[1]}}) '
-        f'ON CREATE SET d.inferred = true '
-        f'MERGE (s) - [:{rel_name} {{layer: 1}}] -> (d) '
-        '} IN TRANSACTIONS'
-    )
-    session.run(query)
-
-
-def load_csvs_into_database():
-    driver = GraphDatabase.driver("bolt://localhost:7687",
-                                  auth=("neo4j", "p@ssw0rd!"))
-
-    with driver.session() as session:
-        ingest_csv(session, "actionblobs.csv",
-                   "AWSActionBlob:UniqueName",
-                   ["name", "regex"])
-        ingest_csv(session, "assumerolepolicies.csv", "AWSAssumeRolePolicy:UniqueHash",
-                   ["hash", "version", "sid"])
-        ingest_csv(session, "conditions.csv", "AWSCondition:UniqueHash",
-                   ["hash", "sid"])
-        ingest_csv(session, "conditionvalues.csv", "AWSConditionValue:UniqueName",
-                   ["name"])
-        ingest_csv(session, "groups.csv", "AWSGroup:UniqueArn",
-                   ["arn", "path", "name", "groupid",
-                    "createdate"])
-        ingest_csv(session, "inlinepolicies.csv", "AWSInlinePolicy:UniqueHash",
-                   ["hash", "policyname"])
-
-        # The name AWSManagedPolicy is a misnomer because AWS Managed
-        # policy implies it is managed by AWS, but a managed policy
-        # is one that gets its own ARN. To fit with the naming scheme,
-        # we are keeping AWSManagedPolicy
-        ingest_csv(session, "managedpolicies.csv", "AWSManagedPolicy:UniqueArn",
-                   ["policyname", "policyid", "arn", "path",
-                    "defaultversionid", "attachmentcount",
-                    "permissionsboundaryusagecount",
-                    "isattachable", "createdate", "updatedate"])
-        ingest_csv(session, "policydocuments.csv", "AWSPolicyDocument:UniqueHash",
-                   ["hash", "version"])
-        ingest_csv(session, "policyversions.csv", "AWSPolicyVersion:UniqueHash",
-                   ["hash", "versionid", "isdefaultversion"])
-        ingest_csv(session, "roles.csv", "AWSRole:UniqueArn",
-                   ["arn", "path", "rolename", "roleid", "createdate",
-                    "rolelastused"])
-        ingest_csv(session, "statements.csv", "AWSStatement:UniqueHash",
-                   ["hash", "effect", "sid"])
-        ingest_csv(session, "users.csv", "AWSUser:UniqueArn",
-                   ["arn", "path", "name", "userid",
-                    "createdate"])
-        ingest_csv(session, "resourceblobs.csv", "AWSResourceBlob:UniqueName",
-                   ['name', 'regex'])
-        ingest_csv(session, "tags.csv", "AWSTag:UniqueHash",
-                   ['hash', 'key', 'value'])
-        ingest_relationships(session, "hash_to_hash_rels.csv", "UniqueHash",
-                             "hash", "AttachedTo", "UniqueHash", "hash")
-        ingest_relationships(session, "hash_to_arn_rels.csv", "UniqueHash",
-                             "hash", "AttachedTo", "UniqueArn", "arn")
-        ingest_relationships(session, "arn_to_arn_rels.csv", "UniqueArn",
-                             "arn", "AttachedTo", "UniqueArn", "arn")
-        ingest_relationships(session, "member_of_rels.csv", "AWSUser", "arn",
-                             "MemberOf", "AWSGroup", "name")
-        ingest_relationships(session, "condition_key_to_condition_rels.csv",
-                             "AWSConditionKey:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "condition_value_to_condition_rels.csv",
-                             "AWSConditionValue:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "operator_to_condition_rels.csv",
-                             "AWSOperator:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "multi_operator_to_condition_rels.csv",
-                             "AWSOperator:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "allow_action_to_statement_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "AllowAction",
-                             "AWSAction:UniqueName", "name")
-        ingest_relationships(session, "deny_action_to_statement_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "DenyAction",
-                             "AWSAction:UniqueName", "name")
-        ingest_relationships(session, "statement_to_allow_action_blob_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "AllowAction",
-                             "AWSActionBlob:UniqueName", "name")
-        ingest_relationships(session, "statement_to_deny_action_blob_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "DenyAction",
-                             "AWSActionBlob:UniqueName", "name")
-        ingest_relationships(session, "statement_to_resource_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "OnResource",
-                             "UniqueArn", "arn")
-        ingest_relationships(session, "statement_to_resource_blob_rels.csv",
-                             "AWSStatement:UniqueHash", "hash",
-                             "OnResource",
-                             "AWSResourceBlob:UniqueName", "name")
-        try:
-            ingest_resources(session, "arns.csv")
-        except neo4j.exceptions.ClientError:
-            pass
-
-
-def rels_to_unique_list(rels):
-    return_list = []
-    for key, values in rels.items():
-        for value in values:
-            return_list.append(
-                {'source': key,
-                 'dest': value})
-
-    return return_list
-
-
-def write_rels_to_csv(outputdir):
-    fields = ['source', 'dest']
-    hash_to_hash_filename = os.path.join(outputdir, "hash_to_hash_rels.csv")
-    hash_to_arn_filename = os.path.join(outputdir, "hash_to_arn_rels.csv")
-    arn_to_arn_rels_filename = os.path.join(outputdir, "arn_to_arn_rels.csv")
-    member_of_rels_filename = os.path.join(outputdir, "member_of_rels.csv")
-    ck_to_condition_rels_filename = os.path.join(
-        outputdir,
-        "condition_key_to_condition_rels.csv")
-
-    operator_to_condition_rels_filename = os.path.join(
-        outputdir,
-        "operator_to_condition_rels.csv")
-    multi_operator_to_condition_rels_filename = os.path.join(
-        output_dir,
-        "multi_operator_to_condition_rels.csv"
-    )
-    condition_value_to_condition_rels_filename = os.path.join(
-        outputdir,
-        "condition_value_to_condition_rels.csv"
-    )
-    allow_action_to_statement_rels_filename = os.path.join(
-        outputdir,
-        "allow_action_to_statement_rels.csv"
-    )
-    deny_action_to_statement_rels_filename = os.path.join(
-        outputdir,
-        "deny_action_to_statement_rels.csv"
-    )
-    statement_to_resource_rels_filename = os.path.join(
-        outputdir,
-        "statement_to_resource_rels.csv"
-    )
-    statement_to_resource_blob_rels_filename = os.path.join(
-        outputdir,
-        "statement_to_resource_blob_rels.csv"
-    )
-
-    statement_to_allow_action_blob_rels_filename = os.path.join(
-        outputdir,
-        "statement_to_allow_action_blob_rels.csv"
-    )
-
-    statement_to_deny_action_blob_rels_filename = os.path.join(
-        outputdir,
-        "statement_to_deny_action_blob_rels.csv"
-    )
-
-    write_to_csv(hash_to_hash_filename,
-                 rels_to_unique_list(hash_to_hash_rels), fields)
-    write_to_csv(hash_to_arn_filename,
-                 rels_to_unique_list(hash_to_arn_rels), fields)
-    write_to_csv(arn_to_arn_rels_filename,
-                 rels_to_unique_list(arn_to_arn_rels), fields)
-    write_to_csv(member_of_rels_filename,
-                 rels_to_unique_list(member_of_rels), fields)
-    write_to_csv(ck_to_condition_rels_filename,
-                 rels_to_unique_list(condition_key_to_condition_rels),
-                 fields)
-    write_to_csv(operator_to_condition_rels_filename,
-                 rels_to_unique_list(operator_to_condition_rels),
-                 fields)
-    write_to_csv(multi_operator_to_condition_rels_filename,
-                 rels_to_unique_list(multi_operator_to_condition_rels),
-                 fields)
-    write_to_csv(condition_value_to_condition_rels_filename,
-                 rels_to_unique_list(condition_value_to_condition_rels),
-                 fields)
-    write_to_csv(allow_action_to_statement_rels_filename,
-                 rels_to_unique_list(allow_action_to_statement_rels),
-                 fields)
-    write_to_csv(deny_action_to_statement_rels_filename,
-                 rels_to_unique_list(deny_action_to_statement_rels),
-                 fields)
-    write_to_csv(statement_to_resource_rels_filename,
-                 rels_to_unique_list(statement_to_resource_rels),
-                 fields)
-    write_to_csv(statement_to_resource_rels_filename,
-                 rels_to_unique_list(statement_to_resource_rels),
-                 fields)
-    write_to_csv(statement_to_resource_blob_rels_filename,
-                 rels_to_unique_list(statement_to_resource_blob_rels),
-                 fields)
-    write_to_csv(statement_to_allow_action_blob_rels_filename,
-                 rels_to_unique_list(statement_to_allow_action_blob_rels),
-                 fields)
-    write_to_csv(statement_to_deny_action_blob_rels_filename,
-                 rels_to_unique_list(statement_to_deny_action_blob_rels),
-                 fields)
-
-
-def delete_layer_1():
-    print("[*] Deleting layer 1")
-    driver = GraphDatabase.driver("bolt://localhost:7687",
-                                  auth=("bloodhound", "bloodhound"))
-    with driver.session() as session:
-        for i in [2, 1]:
-            session.run(
-                f"MATCH () - [r {{layer:{i}}}] - () "
-                "DETACH DELETE r"
-            )
-
-            session.run(
-                f"MATCH (n {{layer: {i}}}) "
-                "DELETE n"
-            )
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output-dir",
@@ -785,6 +900,7 @@ if __name__ == "__main__":
             if filename.endswith('.json'):
                 with open(os.path.join(input_dir, filename), 'r') as f:
                     text = f.read()
-                    json_to_csv(text, output_dir)
-                    write_rels_to_csv(output_dir)
-                    load_csvs_into_database()
+                    parse_json(text)
+        write_nodes_to_csv(output_dir)
+        write_rels_to_csv(output_dir)
+        load_csvs_into_database()

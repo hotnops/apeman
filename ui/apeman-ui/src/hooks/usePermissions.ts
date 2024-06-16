@@ -3,7 +3,8 @@ import apiClient from "../services/api-client";
 
 export interface Permission {
   arn: string;
-  actions: {}[];
+  actions: string[];
+  pathIndex: number;
 }
 
 export interface Node {
