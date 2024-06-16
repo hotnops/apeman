@@ -7,6 +7,7 @@ import ResourceOverview from "./ResourceOverview";
 import NodeOverview from "./NodeOverview";
 import StatementOverview from "./StatementOverview";
 import { kinds } from "../services/nodeService";
+import PolicyOverview from "./PolicyOverview";
 
 interface Props {
   node: Node;
@@ -50,6 +51,9 @@ const NodeOverviewPanel = ({ node }: Props) => {
               ) : null}
               {kind === kinds.AWSStatement ? (
                 <StatementOverview node={node}></StatementOverview>
+              ) : null}
+              {kind === kinds.AWSManagedPolicy ? (
+                <PolicyOverview node={node}></PolicyOverview>
               ) : null}
             </TabPanel>
           ))}

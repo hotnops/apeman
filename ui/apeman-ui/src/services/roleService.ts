@@ -16,6 +16,20 @@ export function GetInboundRoles(roleId: string) {
   };
 }
 
+export function GetOutboundRoles(roleId: string) {
+  const controller = new AbortController();
+  const request = apiClient.get(`/roles/${roleId}/outboundroles`, {
+    signal: controller.signal,
+  });
+
+  return {
+    request,
+    cancel: () => {
+      controller.abort();
+    },
+  };
+}
+
 export function GetInboundPaths(roleId: string) {
   const controller = new AbortController();
   const request = apiClient.get(`/roles/${roleId}/inboundpaths`, {

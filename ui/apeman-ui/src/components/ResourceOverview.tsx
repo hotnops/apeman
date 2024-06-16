@@ -16,7 +16,9 @@ const ResourceOverview = ({ node }: Props) => {
     "resources/" + encode(b64encode(resourceArn)) + "/inboundpermissions";
   return (
     <>
-      <PermissionList endpoint={endpoint}>InboundPermissions</PermissionList>
+      <PermissionList endpoint={endpoint} resourceId={node.id}>
+        InboundPermissions
+      </PermissionList>
     </>
   );
 };

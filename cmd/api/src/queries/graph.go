@@ -117,6 +117,19 @@ func GetAWSNodeTags(ctx context.Context, db graph.Database, nodeID graph.ID) (gr
 	return graphSet, nil
 }
 
+func GetAWSNodeByGraphID(ctx context.Context, db graph.Database, id graph.ID) (*graph.Node, error) {
+	var node *graph.Node
+	err := db.ReadTransaction(ctx, func(tx graph.Transaction) error {
+		if fetchedNode, err := ops.FetchNode(tx, id); err != nil {
+			return err
+		} else {
+			node = fetchedNode
+			return nil
+		}
+	})
+	return node, err
+}
+
 func GetActiveAWSConditionKeys(ctx context.Context, db graph.Database) (graph.NodeSet, error) {
 	// Active condition keys are the ones currently being used which means they are
 	// attached to a condition
@@ -355,7 +368,7 @@ func GetIdentityPolicyPathsOnArnWithAction(ctx context.Context, db graph.Databas
 		}
 	}
 
-	query := "MATCH (b:AWSRole) WHERE b.arn CONTAINS '%s' " +
+	query := "MATCH (b:UniqueArn) WHERE b.arn = '%s' " +
 		"MATCH (a:AWSUser|AWSRole) WHERE a.arn IN [%s] " +
 		"OPTIONAL MATCH p1=(a) <- [:AttachedTo*3..4] - (s1:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s1) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name: '%s'}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH p2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s2:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s2) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
@@ -409,9 +422,9 @@ func GetPathsWithStatement(paths graph.PathSet, statement *graph.Node) graph.Pat
 	return pathsWithStatement
 }
 
-func GetAllIdentityPolicyPathsOnArn(ctx context.Context, db graph.Database, arn string) (graph.PathSet, error) {
+func GetAllIdentityPolicyPathsOnArn(ctx context.Context, db graph.Database, arn string) (*analyze.ActionPathSet, error) {
 
-	query := "MATCH (b:AWSRole) WHERE b.arn CONTAINS '%s' " +
+	query := "MATCH (b:UniqueArn) WHERE b.arn = '%s' " +
 		"MATCH (a:AWSUser|AWSRole) WHERE a.account_id = b.account_id " +
 		"OPTIONAL MATCH p1=(a) <- [:AttachedTo*3..4] - (s1:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s1) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH p2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s2:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s2) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
@@ -468,12 +481,8 @@ func GetAllIdentityPolicyPathsOnArn(ctx context.Context, db graph.Database, arn 
 		return nil, err
 	}
 
-	return resolvedPaths, nil
+	return analyze.IdentityPolicyPathToActionPathSet(resolvedPaths), nil
 
-}
-
-func GetAWSResourceInboundPrincipalsWithAction(ctx context.Context, db graph.Database, targetArn string, action string) (graph.PathSet, error) {
-	return analyze.GetAWSIdentityPolicyPermissions(ctx, db, targetArn, action)
 }
 
 func GetAWSNodeByKindID(ctx context.Context, db graph.Database, propertyName string, id string, kind graph.Kind) (*graph.Node, error) {

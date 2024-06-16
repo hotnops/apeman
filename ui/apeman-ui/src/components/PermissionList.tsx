@@ -1,41 +1,51 @@
-import {
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  List,
-  ListItem,
-  Text,
-} from "@chakra-ui/react";
+import { Accordion, HStack, IconButton, Input, Text } from "@chakra-ui/react";
 import { MdFilterAlt } from "react-icons/md";
 import { useEffect, useState } from "react";
+import PermissionItem from "./PermissionItem";
 import apiClient from "../services/api-client";
 import { IoCloseCircle } from "react-icons/io5";
-import { useApemanGraph } from "../hooks/useApemanGraph";
-import { Path, addPathToGraph } from "../services/pathService";
+
+type PrincipalToActionMap = {
+  [key: string]: string[];
+};
 
 interface Props {
   children: string;
   endpoint: string;
+  resourceId: number;
 }
 
-const PermissionList = ({ children, endpoint }: Props) => {
+const PermissionList = ({ children, endpoint, resourceId }: Props) => {
   const [_, setError] = useState<Error | null>(null);
   const [__, setLoading] = useState(false);
-  const [, setSearchQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-  const [paths, setPaths] = useState<Path[]>([]);
-  const { addNode, addEdge } = useApemanGraph();
+  const [paths, setPaths] = useState<PrincipalToActionMap>({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log("text change");
     setSearchQuery(event.target.value);
   };
 
+  function filterMapBySubstring(
+    map: PrincipalToActionMap,
+    query: string
+  ): PrincipalToActionMap {
+    const filteredMap: PrincipalToActionMap = {};
+
+    for (const [key, value] of Object.entries(map)) {
+      if (value.some((str) => str.includes(query))) {
+        filteredMap[key] = value;
+      }
+    }
+
+    return filteredMap;
+  }
+
   const fetchData = () => {
     const controller = new AbortController();
 
-    const request = apiClient.get<Path[]>(endpoint, {
+    const request = apiClient.get<PrincipalToActionMap>(endpoint, {
       signal: controller.signal,
     });
 
@@ -92,25 +102,17 @@ const PermissionList = ({ children, endpoint }: Props) => {
           onClick={() => setShowFilter(true)}
         ></IconButton>
       </HStack>
-
-      <List>
-        {paths.map((path) => (
-          <ListItem>
-            <HStack>
-              <Text>
-                {path.Nodes[path.Nodes.length - 1].properties.map["name"]}
-              </Text>
-              <Button
-                onClick={() => {
-                  addPathToGraph(path, addNode, addEdge);
-                }}
-              >
-                Add To Graph
-              </Button>
-            </HStack>
-          </ListItem>
-        ))}
-      </List>
+      <Accordion width="100%" allowMultiple={true}>
+        {Object.entries(filterMapBySubstring(paths, searchQuery)).map(
+          ([key, values]) => (
+            <PermissionItem
+              name={key}
+              actions={values}
+              resourceId={resourceId}
+            ></PermissionItem>
+          )
+        )}
+      </Accordion>
     </>
   );
 };

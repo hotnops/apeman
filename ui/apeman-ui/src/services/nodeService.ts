@@ -307,6 +307,20 @@ class NodeService {
       },
     };
   }
+
+  getNodeByArn(arn: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get<Node[]>(NODE_BASE + "?arn=" + arn, {
+      signal: controller.signal,
+    });
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
 }
 
 export default new NodeService();

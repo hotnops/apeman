@@ -19,18 +19,18 @@ import (
 )
 
 type ActionPathEntry struct {
-	PrincipalID  graph.ID
-	PrincipalArn string
-	ResourceArn  string
-	Action       string
-	Path         graph.Path
-	Effect       string
-	Statement    *graph.Node
-	Conditions   graph.NodeSet
+	PrincipalID  graph.ID      `json:"principal_id"`
+	PrincipalArn string        `json:"principal_arn"`
+	ResourceArn  string        `json:"resource_arn"`
+	Action       string        `json:"action"`
+	Path         graph.Path    `json:"path"`
+	Effect       string        `json:"effect"`
+	Statement    *graph.Node   `json:"statement"`
+	Conditions   graph.NodeSet `json:"conditions"`
 }
 
 type ActionPathSet struct {
-	ActionPaths []ActionPathEntry
+	ActionPaths []ActionPathEntry `json:"action_paths"`
 }
 
 func (a *ActionPathEntry) IsEqual(other ActionPathEntry) bool {

@@ -87,7 +87,7 @@ const ApemanGraph = () => {
     alpha: true,
     premultipliedAlpha: true,
     failIfMajorPerformanceCaveat: true,
-    powerPreference: "high-performance",
+    // powerPreference: "high-performance",
     desynchronized: false,
   };
 

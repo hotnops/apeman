@@ -57,7 +57,7 @@ function App() {
         ))}
 
       <Card height="100vh" position="relative" zIndex={0}>
-        <ApemanGraph />
+        <ApemanGraph></ApemanGraph>
       </Card>
       <HStack position="fixed" top={5} right={5} zIndex={1}>
         <Box height="2em" width="2em">

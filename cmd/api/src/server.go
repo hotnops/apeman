@@ -184,19 +184,16 @@ func (s *Server) GetAWSPolicy(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, nodes)
 }
 
-func (s *Server) GetAWSPolicyDetails(c *gin.Context) {
+func (s *Server) GetAWSPolicyPrincipals(c *gin.Context) {
 	propertyName := "policyid"
 	policyId := c.Param(propertyName)
-	detailsMap := make(map[string]any)
 
 	principals, err := queries.GetPrincipalsOfPolicy(s.ctx, s.db, policyId)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
 
-	detailsMap["attachedto"] = principals
-
-	c.IndentedJSON(http.StatusOK, detailsMap)
+	c.IndentedJSON(http.StatusOK, principals.Slice())
 
 }
 
@@ -260,10 +257,11 @@ func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	} else {
 		paths, err := queries.GetAllIdentityPolicyPathsOnArn(s.ctx, s.db, arnString)
+		prinToActionMap := analyze.ActionPathSetToMap(paths)
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
-		c.IndentedJSON(http.StatusOK, paths)
+		c.IndentedJSON(http.StatusOK, prinToActionMap)
 	}
 }
 
@@ -378,8 +376,12 @@ func (s *Server) GetAWSNodeTags(c *gin.Context) {
 }
 
 func (s *Server) GetNodePermissionPath(c *gin.Context) {
-	sourceNodeIdStr := c.Param("nodeid")
-	destNodeIdStr := c.Param("destnodeid")
+	var paths []graph.Path
+	destNodeIdStr := c.Param("nodeid")
+	sourceNodeIdStr := c.Param("destnodeid")
+
+	queryParams := c.Request.URL.Query()
+	action := queryParams.Get("action")
 
 	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
 	if err != nil {
@@ -391,7 +393,16 @@ func (s *Server) GetNodePermissionPath(c *gin.Context) {
 	}
 
 	query := fmt.Sprintf("MATCH p=(a) <- [r *1..4] - (s:AWSStatement) - [r2 *1..5] -> (b) WHERE ALL(rel in r WHERE rel.layer = 1 ) AND ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	if action != "" {
+		sourceNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(sourceNodeId))
+		destNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(destNodeId))
+		sourceArn, _ := sourceNode.Properties.Map["arn"].(string)
+		destArn := destNode.Properties.Map["arn"].(string)
+		paths, err = queries.GetIdentityPolicyPathsOnArnWithAction(s.ctx, s.db, sourceArn, action, []string{destArn})
+	} else {
+		paths, err = queries.CypherQuery(s.ctx, s.db, query)
+	}
+
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -422,16 +433,33 @@ func (s *Server) GetNodeIdentityPath(c *gin.Context) {
 }
 
 func (s *Server) GetInboundRoles(c *gin.Context) {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	log.Printf("[*] GetInboundRoles")
 	roleId := c.Param("roleid")
 
-	paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
+	//paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
+	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform {name: 'sts:AssumeRole'}] -> (b:AWSRole) WHERE b.roleid = '%s' RETURN p"
+	query = fmt.Sprintf(query, roleId)
+	paths, err := queries.CypherQuery(s.ctx, s.db, query)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
-	c.IndentedJSON(http.StatusOK, paths.GetPaths())
+	c.IndentedJSON(http.StatusOK, paths)
+
+}
+
+func (s *Server) GetOutboundRoles(c *gin.Context) {
+
+	roleId := c.Param("roleid")
+
+	//paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
+	query := "MATCH p=(a:AWSRole) - [:IdentityTransform {name: 'sts:AssumeRole'}] -> (b:AWSRole) WHERE a.roleid = '%s' RETURN p"
+	query = fmt.Sprintf(query, roleId)
+	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+	c.IndentedJSON(http.StatusOK, paths)
 
 }
 
@@ -480,10 +508,11 @@ func (s *Server) handleRequests() {
 	router.GET("/roles/:roleid", s.GetAWSRole)
 	router.GET("/roles/:roleid/policies", s.GetRolePolicies)
 	router.GET("/roles/:roleid/inboundroles", s.GetInboundRoles)
+	router.GET("/roles/:roleid/outboundroles", s.GetOutboundRoles)
 	router.GET("/users/:userid", s.GetAWSUser)
 	router.GET("/users/:userid/policies", s.GetUserPolicies)
 	router.GET("/managedpolicies/:policyid", s.GetAWSPolicy)
-	router.GET("/managedpolicies/:policyid/details", s.GetAWSPolicyDetails)
+	router.GET("/managedpolicies/:policyid/principals", s.GetAWSPolicyPrincipals)
 	router.GET("/groups/:groupid", s.GetAWSGroup)
 	router.GET("/groups/:groupid/policies", s.GetGroupPolicies)
 	router.GET("/accounts/:account_id", s.GetAWSAccount)

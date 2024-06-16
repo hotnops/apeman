@@ -7,6 +7,21 @@ export interface Path {
   Edges: Relationship[];
 }
 
+export interface ActionPathEntry {
+  principal_id: number;
+  principal_arn: string;
+  resource_arn: string;
+  action: string;
+  path: Path;
+  effect: string;
+  statement: Node;
+  conditions: Node[];
+}
+
+export interface ActionPathSet {
+  action_paths: ActionPathEntry[];
+}
+
 export interface PathResponse {
   paths: Path[];
 }
@@ -80,6 +95,27 @@ export function GetNodePermissionPath(startNodeId: number, endNodeId: number) {
   const controller = new AbortController();
   const request = apiClient.get(
     `/node/${startNodeId}/permissionpath/${endNodeId}`,
+    {
+      signal: controller.signal,
+    }
+  );
+
+  return {
+    request,
+    cancel: () => {
+      controller.abort();
+    },
+  };
+}
+
+export function GetNodePermissionPathWithAction(
+  startNodeId: number,
+  endNodeId: number,
+  action: string
+) {
+  const controller = new AbortController();
+  const request = apiClient.get<Path[]>(
+    `/node/${startNodeId}/permissionpath/${endNodeId}?action=${action}`,
     {
       signal: controller.signal,
     }
