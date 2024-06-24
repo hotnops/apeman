@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/specterops/bloodhound/dawgs/graph"
 )
@@ -31,7 +32,7 @@ func RemovePathByIndex(g *graph.PathSet, index int) {
 	(*g) = append((*g)[:index], (*g)[index+1:]...)
 }
 
-func ResolveConditons(path graph.Path) (bool, error) {
+func ResolveConditons(entry ActionPathEntry) (bool, error) {
 	return true, nil
 }
 
@@ -55,21 +56,12 @@ func addUniqueItem(slice []string, item string) []string {
 	return append(slice, item)
 }
 
-func ActionPathSetToMap(actionSet *ActionPathSet) PrincipalToActionMap {
-	actionMap := make(PrincipalToActionMap)
-	for _, actionPath := range actionSet.ActionPaths {
-		principal := actionPath.PrincipalArn
-		action := actionPath.Action
-		var actions []string
-		var ok bool
-		// if the principal is not in the map, add it
-		if actions, ok = actionMap[principal]; !ok {
-			actions = make([]string, 0)
-		}
-		// add the action to the principal's list if it's not already there
-		actions = addUniqueItem(actions, action)
-		actionMap[principal] = actions
-
+func extractAccountID(arn string) (string, error) {
+	parts := strings.Split(arn, ":")
+	if len(parts) < 6 {
+		return "", fmt.Errorf("Invalid ARN format")
 	}
-	return actionMap
+	accountID := parts[4]
+	return accountID, nil
+
 }

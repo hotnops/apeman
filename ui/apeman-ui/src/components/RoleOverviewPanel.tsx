@@ -9,6 +9,8 @@ import AccordionList from "./AccordionList";
 import { Path, addPathToGraph } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import PathAccordionList from "./PathAccordionList";
+import RSOPPanel from "./RSOPPanel";
+import PermissionList from "./PermissionList";
 
 interface Props {
   node: Node;
@@ -115,6 +117,12 @@ const RoleOverviewPanel = ({ node }: Props) => {
           name="Attached Policies"
         ></AccordionList>
       </Accordion>
+      <PermissionList
+        endpoint={"roles/" + node.properties.map.roleid + "/rsop"}
+        resourceId={() => node.id}
+      >
+        Resultant Set Of Policy
+      </PermissionList>
     </>
   );
 };

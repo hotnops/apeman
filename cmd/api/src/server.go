@@ -148,6 +148,20 @@ func (s *Server) GetAWSUser(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, nodes)
 }
 
+func (s *Server) GetUserRSOP(c *gin.Context) {
+	userId := c.Param("userid")
+	node, err := queries.GetAWSNodeByKindID(s.ctx, s.db, "userid", userId, aws.AWSRole)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	paths, err := queries.GetUnresolvedOutputPaths(s.ctx, s.db, node)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, paths)
+}
+
 func (s *Server) GetAWSGroup(c *gin.Context) {
 	propertyName := "groupid"
 	id := c.Param(propertyName)
@@ -256,8 +270,17 @@ func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 	if arnString, err := DecodeArn((encodedArn)); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	} else {
-		paths, err := queries.GetAllIdentityPolicyPathsOnArn(s.ctx, s.db, arnString)
-		prinToActionMap := analyze.ActionPathSetToMap(paths)
+		// All the paths that act on this resource
+		identityPaths, err := queries.GetAllUnresolvedIdentityPolicyPathsOnArn(s.ctx, s.db, arnString)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+		// Filter through
+		resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+		prinToActionMap := analyze.ActionPathSetToMap(*resolvedPaths)
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
@@ -316,7 +339,7 @@ func corsMiddleware() gin.HandlerFunc {
 func (s *Server) PostQuery(c *gin.Context) {
 	query := c.PostForm("query")
 
-	if response, err := queries.CypherQuery(s.ctx, s.db, query); err != nil {
+	if response, err := queries.CypherQueryPaths(s.ctx, s.db, query); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	} else {
 		c.JSON(http.StatusOK, response)
@@ -351,7 +374,7 @@ func (s *Server) GetNodeShortestPath(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
 
-	paths, err := queries.CypherQuery(s.ctx, s.db, fmt.Sprintf("MATCH p=(a) - [*1..3] - (b) WHERE ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId))
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, fmt.Sprintf("MATCH p=(a) - [*1..3] - (b) WHERE ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId))
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -376,38 +399,38 @@ func (s *Server) GetAWSNodeTags(c *gin.Context) {
 }
 
 func (s *Server) GetNodePermissionPath(c *gin.Context) {
-	var paths []graph.Path
-	destNodeIdStr := c.Param("nodeid")
-	sourceNodeIdStr := c.Param("destnodeid")
+	// var paths []graph.Path
+	// destNodeIdStr := c.Param("nodeid")
+	// sourceNodeIdStr := c.Param("destnodeid")
 
-	queryParams := c.Request.URL.Query()
-	action := queryParams.Get("action")
+	// queryParams := c.Request.URL.Query()
+	// action := queryParams.Get("action")
 
-	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
-	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
-	}
-	destNodeId, err := strconv.Atoi(destNodeIdStr)
-	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
-	}
+	// sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
+	// if err != nil {
+	// 	c.AbortWithError(http.StatusBadRequest, err)
+	// }
+	// destNodeId, err := strconv.Atoi(destNodeIdStr)
+	// if err != nil {
+	// 	c.AbortWithError(http.StatusBadRequest, err)
+	// }
 
-	query := fmt.Sprintf("MATCH p=(a) <- [r *1..4] - (s:AWSStatement) - [r2 *1..5] -> (b) WHERE ALL(rel in r WHERE rel.layer = 1 ) AND ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
-	if action != "" {
-		sourceNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(sourceNodeId))
-		destNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(destNodeId))
-		sourceArn, _ := sourceNode.Properties.Map["arn"].(string)
-		destArn := destNode.Properties.Map["arn"].(string)
-		paths, err = queries.GetIdentityPolicyPathsOnArnWithAction(s.ctx, s.db, sourceArn, action, []string{destArn})
-	} else {
-		paths, err = queries.CypherQuery(s.ctx, s.db, query)
-	}
+	// query := fmt.Sprintf("MATCH p=(a) <- [r *1..4] - (s:AWSStatement) - [r2 *1..5] -> (b) WHERE ALL(rel in r WHERE rel.layer = 1 ) AND ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
+	// if action != "" {
+	// 	sourceNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(sourceNodeId))
+	// 	destNode, _ := queries.GetAWSNodeByGraphID(s.ctx, s.db, graph.ID(destNodeId))
+	// 	sourceArn, _ := sourceNode.Properties.Map["arn"].(string)
+	// 	destArn := destNode.Properties.Map["arn"].(string)
+	// 	paths, err = queries.GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(s.ctx, s.db, sourceArn, action, []string{destArn})
+	// } else {
+	// 	paths, err = queries.CypherQueryPaths(s.ctx, s.db, query)
+	// }
 
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	c.IndentedJSON(http.StatusOK, paths)
+	// if err != nil {
+	// 	c.AbortWithError(http.StatusInternalServerError, err)
+	// 	return
+	// }
+	c.IndentedJSON(http.StatusOK, nil)
 }
 
 func (s *Server) GetNodeIdentityPath(c *gin.Context) {
@@ -424,7 +447,7 @@ func (s *Server) GetNodeIdentityPath(c *gin.Context) {
 	}
 
 	query := fmt.Sprintf("MATCH p=shortestPath((a) - [:CanAssume*] -> (b)) WHERE ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -438,7 +461,7 @@ func (s *Server) GetInboundRoles(c *gin.Context) {
 	//paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
 	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform {name: 'sts:AssumeRole'}] -> (b:AWSRole) WHERE b.roleid = '%s' RETURN p"
 	query = fmt.Sprintf(query, roleId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -454,7 +477,7 @@ func (s *Server) GetOutboundRoles(c *gin.Context) {
 	//paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
 	query := "MATCH p=(a:AWSRole) - [:IdentityTransform {name: 'sts:AssumeRole'}] -> (b:AWSRole) WHERE a.roleid = '%s' RETURN p"
 	query = fmt.Sprintf(query, roleId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -463,10 +486,24 @@ func (s *Server) GetOutboundRoles(c *gin.Context) {
 
 }
 
+func (s *Server) GetRoleRSOP(c *gin.Context) {
+	roleId := c.Param("roleid")
+	node, err := queries.GetAWSNodeByKindID(s.ctx, s.db, "roleid", roleId, aws.AWSRole)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	paths, err := queries.GetUnresolvedOutputPaths(s.ctx, s.db, node)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+	actionToPrin := analyze.ResourcePathSetToMap(*paths)
+	c.IndentedJSON(http.StatusOK, actionToPrin)
+}
+
 func (s *Server) GetAWSTierZeroNodes(c *gin.Context) {
 	accountId := c.Param("nodeid")
 	query := fmt.Sprintf("MATCH (n) WHERE n.tier_zero = true AND n.account_id = '%s' RETURN n", accountId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -490,7 +527,7 @@ func (s *Server) GetAllAssumeRoles(c *gin.Context) {
 func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
 	accountId := c.Param("nodeid")
 	query := fmt.Sprintf("MATCH p=() - [:CanAssume*1..4] -> (t:AWSRole) WHERE t.tier_zero = true AND t.account_id = '%s' RETURN p", accountId)
-	paths, err := queries.CypherQuery(s.ctx, s.db, query)
+	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -509,8 +546,10 @@ func (s *Server) handleRequests() {
 	router.GET("/roles/:roleid/policies", s.GetRolePolicies)
 	router.GET("/roles/:roleid/inboundroles", s.GetInboundRoles)
 	router.GET("/roles/:roleid/outboundroles", s.GetOutboundRoles)
+	router.GET("/roles/:roleid/rsop", s.GetRoleRSOP)
 	router.GET("/users/:userid", s.GetAWSUser)
 	router.GET("/users/:userid/policies", s.GetUserPolicies)
+	router.GET("/users/:userid/rsop", s.GetUserRSOP)
 	router.GET("/managedpolicies/:policyid", s.GetAWSPolicy)
 	router.GET("/managedpolicies/:policyid/principals", s.GetAWSPolicyPrincipals)
 	router.GET("/groups/:groupid", s.GetAWSGroup)
@@ -554,7 +593,6 @@ func (s *Server) InitializeServer() {
 	if err != nil {
 		log.Fatalf("Failed to open graph database")
 	}
-
 }
 
 func (s *Server) Start() {

@@ -12,7 +12,7 @@ type PrincipalToActionMap = {
 interface Props {
   children: string;
   endpoint: string;
-  resourceId: number;
+  resourceId: () => number;
 }
 
 const PermissionList = ({ children, endpoint, resourceId }: Props) => {
@@ -32,6 +32,10 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
     query: string
   ): PrincipalToActionMap {
     const filteredMap: PrincipalToActionMap = {};
+
+    if (query === "") {
+      return map;
+    }
 
     for (const [key, value] of Object.entries(map)) {
       if (value.some((str) => str.includes(query))) {
@@ -65,6 +69,8 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
       .then((res) => {
         //setPermissions(res.data);
         // Create a string to action list map
+        console.log("RSOP");
+        console.log(res.data);
         setPaths(res.data);
       })
       .catch((err) => {
@@ -108,7 +114,7 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
             <PermissionItem
               name={key}
               actions={values}
-              resourceId={resourceId}
+              resourceId={resourceId()}
             ></PermissionItem>
           )
         )}

@@ -74,3 +74,9 @@ const (
 	RoleName				Property = "rolename"
 	UpdateDate				Property = "updatedate"
 )
+
+type IdentityTrasformType string
+
+const (
+	IdentityTransformAssumeRole IdentityTrasformType = "sts:assumerole"
+)

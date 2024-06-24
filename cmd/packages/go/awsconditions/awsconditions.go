@@ -1,7 +1,8 @@
 package awsconditions
 
-import "github.com/specterops/bloodhound/dawgs/graph"
+import "github.com/hotnops/apeman/analyze"
 
-func ResolvePathConditions(path graph.Path) {
+func ResolvePathConditions(actionPathEntry analyze.ActionPathEntry) (bool, error) {
+	return true, nil
 
 }

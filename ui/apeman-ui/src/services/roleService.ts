@@ -44,6 +44,20 @@ export function GetInboundPaths(roleId: string) {
   };
 }
 
+export function GetRoleRSOP(roleId: string) {
+  const controller = new AbortController();
+  const request = apiClient.get(`/roles/${roleId}/rsop`, {
+    signal: controller.signal,
+  });
+
+  return {
+    request,
+    cancel: () => {
+      controller.abort();
+    },
+  };
+}
+
 class RoleService {
   getRolePolicyNodes(roleid: string) {
     const controller = new AbortController();
