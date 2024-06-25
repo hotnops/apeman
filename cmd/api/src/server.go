@@ -186,6 +186,18 @@ func (s *Server) GetAWSAccount(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, nodes)
 }
 
+func (s *Server) GetAWSAccountServices(c *gin.Context) {
+	propertyName := "account_id"
+	id := c.Param(propertyName)
+
+	nodes, err := queries.GetAWSAccountServices(s.ctx, s.db, id)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, nodes)
+}
+
 func (s *Server) GetAWSAccountIDs(c *gin.Context) {
 	nodes, err := queries.GetAWSAccountIDs(s.ctx, s.db)
 	if err != nil {
@@ -565,6 +577,7 @@ func (s *Server) handleRequests() {
 	router.GET("/groups/:groupid/policies", s.GetGroupPolicies)
 	router.GET("/accounts", s.GetAWSAccountIDs)
 	router.GET("/accounts/:account_id", s.GetAWSAccount)
+	router.GET("/accounts/:account_id/services", s.GetAWSAccountServices)
 	router.GET("/resources/:arn", s.GetAWSResource)
 	router.GET("/resources/:arn/inboundpermissions", s.GetAWSResourceInboundPermissions)
 	router.GET("/conditionkeys/active", s.GetActiveAWSConditionKeys)

@@ -129,7 +129,7 @@ func GetAWSAccountIDs(ctx context.Context, db graph.Database) ([]string, error) 
 		if err != nil {
 			continue
 		}
-		if accountID != "" {
+		if accountID == "" {
 			continue
 		}
 		accountIDs = append(accountIDs, accountID)
@@ -137,7 +137,7 @@ func GetAWSAccountIDs(ctx context.Context, db graph.Database) ([]string, error) 
 	return accountIDs, nil
 }
 
-func GetAWSAccountServices(ctx context.Context, db graph.Database, accountID graph.ID) ([]string, error) {
+func GetAWSAccountServices(ctx context.Context, db graph.Database, accountID string) ([]string, error) {
 	var services []string
 
 	query := "MATCH (a:UniqueArn) WHERE a.account_id = $account_id RETURN DISTINCT a.service"
