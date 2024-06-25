@@ -7,14 +7,15 @@ import (
 )
 
 type ActionPathEntry struct {
-	PrincipalID  graph.ID      `json:"principal_id"`
-	PrincipalArn string        `json:"principal_arn"`
-	ResourceArn  string        `json:"resource_arn"`
-	Action       string        `json:"action"`
-	Path         graph.Path    `json:"path"`
-	Effect       string        `json:"effect"`
-	Statement    *graph.Node   `json:"statement"`
-	Conditions   graph.NodeSet `json:"conditions"`
+	PrincipalID       graph.ID      `json:"principal_id"`
+	PrincipalArn      string        `json:"principal_arn"`
+	IsPrincipalDirect bool          `json:"is_principal_direct"`
+	ResourceArn       string        `json:"resource_arn"`
+	Action            string        `json:"action"`
+	Path              graph.Path    `json:"path"`
+	Effect            string        `json:"effect"`
+	Statement         *graph.Node   `json:"statement"`
+	Conditions        graph.NodeSet `json:"conditions"`
 }
 
 func (a *ActionPathEntry) IsEqual(other ActionPathEntry) bool {

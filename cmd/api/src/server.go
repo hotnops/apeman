@@ -186,6 +186,15 @@ func (s *Server) GetAWSAccount(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, nodes)
 }
 
+func (s *Server) GetAWSAccountIDs(c *gin.Context) {
+	nodes, err := queries.GetAWSAccountIDs(s.ctx, s.db)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, nodes)
+}
+
 func (s *Server) GetAWSPolicy(c *gin.Context) {
 	propertyName := "policyid"
 	id := c.Param(propertyName)
@@ -554,6 +563,7 @@ func (s *Server) handleRequests() {
 	router.GET("/managedpolicies/:policyid/principals", s.GetAWSPolicyPrincipals)
 	router.GET("/groups/:groupid", s.GetAWSGroup)
 	router.GET("/groups/:groupid/policies", s.GetGroupPolicies)
+	router.GET("/accounts", s.GetAWSAccountIDs)
 	router.GET("/accounts/:account_id", s.GetAWSAccount)
 	router.GET("/resources/:arn", s.GetAWSResource)
 	router.GET("/resources/:arn/inboundpermissions", s.GetAWSResourceInboundPermissions)

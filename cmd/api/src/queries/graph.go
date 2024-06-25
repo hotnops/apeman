@@ -116,12 +116,58 @@ func GetActiveAWSConditionKeys(ctx context.Context, db graph.Database) (graph.No
 	return nodes, nil
 }
 
+func GetAWSAccountIDs(ctx context.Context, db graph.Database) ([]string, error) {
+	var accountIDs []string
+	query := "MATCH (a:UniqueArn) RETURN DISTINCT a.account_id"
+	results, err := RawCypherQuery(ctx, db, query, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, result := range results {
+		var accountID string
+		err = result.Map(&accountID)
+		if err != nil {
+			continue
+		}
+		if accountID != "" {
+			continue
+		}
+		accountIDs = append(accountIDs, accountID)
+	}
+	return accountIDs, nil
+}
+
+func GetAWSAccountServices(ctx context.Context, db graph.Database, accountID graph.ID) ([]string, error) {
+	var services []string
+
+	query := "MATCH (a:UniqueArn) WHERE a.account_id = $account_id RETURN DISTINCT a.service"
+	params := map[string]interface{}{"account_id": accountID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		var service string
+		err = result.Map(&service)
+		if err != nil {
+			continue
+		}
+		services = append(services, service)
+	}
+
+	return services, nil
+
+}
+
 func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database, roleId string) (*analyze.ActionPathSet, error) {
 	// First, get all the principals that are trusted to assume this role
-	query := "MATCH p=(a:AWSRole) <- [:AttachedTo] - (:AWSAssumeRolePolicy) <- [:AttachedTo] - (s:AWSStatement) - [r:Resource|ExpandsTo*1..2] -> (b:AWSRole|AWSUser) WHERE a.roleid = $roleid " +
+	query := "MATCH p=(a:AWSRole) <- [:AttachedTo] - (:AWSAssumeRolePolicy) <- [:AttachedTo] - (s:AWSStatement) - [:Principal|ExpandsTo*1..2] -> (b:AWSRole|AWSUser) WHERE a.roleid = $roleid AND (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name:'sts:assumerole'}) " +
 		"WITH a, s, b " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN b, a.arn, s, COALESCE(c IS NOT NULL, false)"
+		"OPTIONAL MATCH (s) - [:Principal] - > (pb:AWSPrincipalBlob) - [:ExpandsTo*1..2] -> (b) " +
+		"RETURN b, a.arn, s, COALESCE(c IS NOT NULL, false), COALESCE(pb IS NOT NULL, false)"
 
 	params := map[string]any{
 		"roleid": roleId,
@@ -140,6 +186,7 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		var destArn string
 		var statement graph.Node
 		var conditionExists bool
+		var isPrinExpanded bool
 
 		err = result.Map(&sourceNode)
 		if err != nil {
@@ -154,6 +201,11 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 			continue
 		}
 		err = result.Map(&conditionExists)
+		if err != nil {
+			continue
+		}
+
+		err = result.Map(&isPrinExpanded)
 		if err != nil {
 			continue
 		}
@@ -174,6 +226,8 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Statement = &statement
+		newActionPathEntry.Action = "sts:assumerole"
+		newActionPathEntry.IsPrincipalDirect = !isPrinExpanded
 		resourcePathSet.Add(newActionPathEntry)
 	}
 
@@ -199,87 +253,6 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 	}
 
 	return resolvedPaths, nil
-
-	// formatted_query := fmt.Sprintf(query, roleId)
-
-	// resourcePaths := graph.NewPathSet()
-
-	// targetNode, err := GetAWSNodeByKindID(ctx, db, "roleid", roleId, aws.AWSRole)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// arn, _ := targetNode.Properties.Get("arn").String()
-	// pathSet, _ := CypherQueryPaths(ctx, db, formatted_query)
-
-	// statements := pathSet.AllNodes().ContainingNodeKinds(aws.AWSStatement)
-	// for _, statement := range statements {
-
-	// 	// Get the actions for the statement
-	// 	action_query := "MATCH p=(s:AWSStatement) - [:Action|ExpandsTo*1..2] -> (:AWSAction) WHERE ID(s) = %d RETURN p"
-	// 	formatted_query := fmt.Sprintf(action_query, statement.ID)
-	// 	actionPaths, _ := CypherQueryPaths(ctx, db, formatted_query)
-
-	// 	condition_query := "MATCH p=(s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = %d RETURN p"
-	// 	formatted_query = fmt.Sprintf(condition_query, statement.ID)
-	// 	conditionPaths, err := CypherQueryPaths(ctx, db, formatted_query)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	pathsWithStatement := GetPathsWithStatement(pathSet, statement)
-
-	// 	enrichedPath := graph.Path{}
-	// 	for _, actionPath := range actionPaths {
-	// 		enrichedPath, _ = MergePaths(actionPath, enrichedPath)
-	// 	}
-	// 	for _, conditionPath := range conditionPaths {
-	// 		enrichedPath, _ = MergePaths(conditionPath, enrichedPath)
-	// 	}
-
-	// 	for _, path := range pathsWithStatement {
-	// 		fullPath, _ := MergePaths(path, enrichedPath)
-	// 		resourcePaths.AddPath(fullPath)
-	// 	}
-	// }
-
-	// resourceActionPathSet := analyze.ResourcePolicyPathToActionPathSet(resourcePaths)
-	// principalArns := resourceActionPathSet.GetPrincipals()
-
-	// identityPaths := graph.NewPathSet()
-	// uniqueActions := resourcePaths.AllNodes().ContainingNodeKinds(aws.AWSAction)
-	// if len(principalArns) > 0 {
-	// 	for _, action := range uniqueActions {
-	// 		// For each action, get the identity policy permissions
-	// 		// and then get the union of these paths and the resolved paths
-	// 		actionName, err := action.Properties.Get("name").String()
-	// 		if err != nil {
-	// 			log.Printf("[!] Error getting action name: %s", err.Error())
-	// 			continue
-	// 		}
-	// 		actionPaths, err := GetIdentityPolicyPathsOnArnWithAction(ctx, db, arn, actionName, principalArns)
-	// 		if err != nil {
-	// 			log.Printf("[!] Error getting identity policy permissions: %s", err.Error())
-	// 			continue
-	// 		}
-	// 		identityPaths.AddPathSet(actionPaths)
-	// 	}
-	// }
-
-	// identityActionPathSet := analyze.IdentityPolicyPathToActionPathSet(identityPaths)
-
-	// // Get the intersection of the two path sets. Unlike most resource policies,
-	// // which are unions, assume role policy must be an intersection.
-	// allowedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(resourceActionPathSet, identityActionPathSet)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// // Now filter out identity based paths
-	// // For each path, check the identity policy allows the action
-
-	// // Get the intersection of the resolved paths and the identity paths
-	// return allowedPaths, nil
 }
 
 func CreateIdentityTransformEdge(ctx context.Context, db graph.Database, sourceNodes []graph.ID, targetNode graph.ID, name string) error {
@@ -299,11 +272,13 @@ func CreateIdentityTransformEdge(ctx context.Context, db graph.Database, sourceN
 
 func CreateAssumeRoleEdgesToRole(ctx context.Context, db graph.Database, roleNode *graph.Node, counter *Counter) {
 	roleId, _ := roleNode.Properties.Get(string(aws.RoleId)).String()
+	roleArn, _ := roleNode.Properties.Get("arn").String()
 	rolePaths, err := GetAWSRoleInboundRoleAssumptionPaths(ctx, db, roleId)
 	if err != nil {
 		log.Printf("[!] Error getting role assumption paths: %s", err.Error())
 	}
 	if rolePaths == nil {
+		log.Printf("[!] No role assumption paths found for role %s", roleArn)
 		return
 	}
 
@@ -525,7 +500,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		"WITH a, s, b " +
 		"MATCH p2 = (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a.arn, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
 
 	params := map[string]any{
 		"roleId":     roleId,

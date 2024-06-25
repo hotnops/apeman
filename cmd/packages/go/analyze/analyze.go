@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/hotnops/apeman/graphschema/aws"
@@ -52,10 +53,17 @@ func GetPrincipalFromResourcePath(path graph.Path) (*graph.Node, error) {
 	return nil, fmt.Errorf("resource not found")
 }
 
+func GetAccountIDFromArn(arn string) string {
+	arnParts := strings.Split(arn, ":")
+	if len(arnParts) > 4 {
+		return arnParts[4]
+	}
+	return ""
+}
+
 func ResolveAssumeRolePaths(assumeRoleSet *ActionPathSet, identityActionSet *ActionPathSet) (*ActionPathSet, error) {
 	denyPathSet := new(ActionPathSet)
 	condDenyPathSet := new(ActionPathSet)
-	condAllowPathSet := new(ActionPathSet)
 	resolvedPaths := new(ActionPathSet)
 
 	resourceAllow, resourceDeny, resourceCondAllow, resourceCondDeny := assumeRoleSet.SplitByConditionalEffect()
@@ -90,21 +98,35 @@ func ResolveAssumeRolePaths(assumeRoleSet *ActionPathSet, identityActionSet *Act
 		}
 	}
 
-	condAllowPathSet.AddPathSet(*resourceCondAllow)
-	condAllowPathSet.AddPathSet(*identityCondAllow)
-
-	for _, condAllowPath := range *condAllowPathSet {
+	for _, condAllowPath := range *resourceCondAllow {
 		// Check if the condition is satisfied
 		if resolved, err := ResolveConditons(condAllowPath); err != nil {
 			continue
 		} else if resolved {
-			resolvedPaths.Add(condAllowPath)
+			resourceAllow.Add(condAllowPath)
 		}
 	}
 
-	for _, resourceAllow := range *resourceAllow {
-		if identityActionSet.ContainsActionPath(resourceAllow) {
-			resolvedPaths.Add(resourceAllow)
+	for _, condAllowPath := range *identityCondAllow {
+		// Check if the condition is satisfied
+		if resolved, err := ResolveConditons(condAllowPath); err != nil {
+			continue
+		} else if resolved {
+			identityAllow.Add(condAllowPath)
+		}
+	}
+
+	// Each allow path must be in both sets
+	for _, resourceAllowPath := range *resourceAllow {
+		principalAccountId := GetAccountIDFromArn(resourceAllowPath.PrincipalArn)
+		resourceAccountId := GetAccountIDFromArn(resourceAllowPath.ResourceArn)
+		// If the resource specifically calls out a principal in the same account,
+		// the identity policy is not needed
+		if (principalAccountId == resourceAccountId) && (resourceAllowPath.IsPrincipalDirect) {
+			resolvedPaths.Add(resourceAllowPath)
+		} else if identityAllow.ContainsActionPath(resourceAllowPath) {
+			// Check if they are in the same account and directly referenced
+			resolvedPaths.Add(resourceAllowPath)
 		}
 	}
 

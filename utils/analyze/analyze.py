@@ -4,6 +4,20 @@ import re
 
 from neo4j import GraphDatabase
 
+def populate_principal_blob(session):  
+    print("[*] Expanding principal blobs")
+    cypher_query = """
+    CALL apoc.periodic.iterate(
+        "MATCH (a:AWSPrincipalBlob) RETURN a",
+        "
+        MATCH (b:AWSUser|AWSRole|AWSGroup|AWSIdentityProvider|AWSService)
+        WHERE b.arn =~ a.regex OR b.name =~ a.regex
+        MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
+        ",
+        {batchSize: 10, parallel: true}
+    )
+    """
+    session.run(cypher_query)
 
 def populate_resource_blob(session):
     print("[*] Expanding resource blobs")
@@ -102,7 +116,7 @@ def populate_resource_types(session):
     CALL apoc.periodic.iterate(
         "MATCH (a:AWSResourceType) RETURN a",
         "MATCH (b:UniqueArn) WHERE (b.arn =~ a.regex)
-         MERGE (b)  - [:TypeOf] -> (a)",
+         MERGE (b)  - [:TypeOf {layer: 2}] -> (a)",
         {batchSize: 10, parallel: true}
         )
     """
@@ -395,6 +409,7 @@ def analyze():
         populate_action_blob(session)
         #populate_not_actions(session)
         populate_resource_blob(session)
+        populate_principal_blob(session)
         #populate_not_resources(session)
         #(session)
 
