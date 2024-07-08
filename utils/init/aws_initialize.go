@@ -141,11 +141,45 @@ func get_service_dict(link string) {
 	error_check(err)
 
 	//table #may change with each html response so i should figure out how to add programatically
-	doc.Find("table#w43aab5b9e1671c11c13").Each(func(column int, td *goquery.Selection) {
-		td.Find("td").Each(func(col int, td *goquery.Selection) {
-			fmt.Println(strings.TrimSpace(td.Text()), (col % 9))
+	doc.Find("table#w43aab5b9e1671c11c13").Each(func(column int, tr *goquery.Selection) {
+		tr.Find("tr").Each(func(col int, td *goquery.Selection) {
+			td.Find("td").Each(func(col int, td *goquery.Selection) {
+			
+			
+			if col == 0 && td.Text() != ""{
+				if (strings.Contains(td.Text(),"sampling-rule") || strings.Contains(td.Text(),"group")) {
+					fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
+
+				}else{
+				fmt.Printf("Actions \t %s\n",strings.TrimSpace(td.Text()))
+				}
+
+			}else if col == 1 && td.Text() != "" {
+				if(strings.Contains(td.Text(),"aws:")){
+					fmt.Printf("Condition Keys \t %s\n",strings.TrimSpace(td.Text()))
+
+				}else{
+					fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
+				}
+
+			} else if col == 2 && td.Text() != "" {
+				fmt.Printf("Description \t %s\n",strings.TrimSpace(td.Text()))
+
+			} else if col == 3 {
+				fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
+
+			} else if col == 4 {
+				fmt.Printf("Condition Keys \t %s\n",strings.TrimSpace(td.Text()))
+
+			 }else{
+				fmt.Printf("\n")
+			}
+			})
+			fmt.Printf("\n")
 		})
+		
 	})
+
 
 }
 
