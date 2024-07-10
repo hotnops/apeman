@@ -35,6 +35,7 @@
     "react-complex-tree": "^2.4.4",
     "react-dom": "^18.2.0",
     "react-icons": "^5.0.1",
+    "react-syntax-highlighter": "^15.5.0",
     "reagraph": "^4.15.6",
     "regraph": "^0.0.1",
     "sigma": "^2.4.0",

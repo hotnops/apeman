@@ -9,6 +9,11 @@ import {
   Tr,
   Divider,
   Card,
+  AccordionItem,
+  AccordionButton,
+  Box,
+  AccordionIcon,
+  AccordionPanel,
 } from "@chakra-ui/react";
 import RoleService, {
   GetInboundRoles,
@@ -20,6 +25,8 @@ import { useApemanGraph } from "../hooks/useApemanGraph";
 import PathAccordionList from "./PathAccordionList";
 import RSOPPanel from "./RSOPPanel";
 import PermissionList from "./PermissionList";
+import { AsyncGetInlinePolicyJSON } from "../services/policyService";
+import InlinePolicy from "./InlinePolicy";
 
 interface Props {
   node: Node;
@@ -35,9 +42,9 @@ const RoleOverviewPanel = ({ node }: Props) => {
     let isMounted = true; // Flag to prevent setting state if the component is unmounted
     setAttachedPolicies([]);
 
-    const fetchPolicies = async () => {
+    const fetchManagedPolicies = async () => {
       try {
-        const { request } = RoleService.getRolePolicyNodes(
+        const { request } = RoleService.getRoleManagedPolicyNodes(
           node.properties.map.roleid
         );
         const res = await request;
@@ -58,7 +65,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
       }
     };
 
-    fetchPolicies();
+    fetchManagedPolicies();
 
     return () => {
       isMounted = false; // Prevent state updates if the component is unmounted
@@ -150,9 +157,10 @@ const RoleOverviewPanel = ({ node }: Props) => {
         <Accordion allowMultiple={true} width="100%">
           <AccordionList
             nodes={attachedPolicies}
-            name="Attached Policies"
+            name="Managed Policies"
           ></AccordionList>
         </Accordion>
+        <InlinePolicy principalNode={node} />
       </Card>
       <Card>
         <PermissionList

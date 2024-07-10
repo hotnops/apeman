@@ -617,37 +617,198 @@ func GetPathsWithStatement(paths graph.PathSet, statement *graph.Node) graph.Pat
 	return pathsWithStatement
 }
 
-func GenerateStatementObject(ctx context.Context, db graph.Database, statementID graph.ID) (map[string]any, error) {
-	statementObject := map[string]any{}
-	var statement *graph.Node
+func GenerateInlinePolicyObject(ctx context.Context, db graph.Database, policyHash string) (map[string]any, error) {
 
-	err := db.ReadTransaction(ctx, func(tx graph.Transaction) error {
-		if fetchedNode, err := ops.FetchNode(tx, statementID); err != nil {
-			return err
-		} else {
-			statement = fetchedNode
-			return nil
-		}
-	})
+	// Get each statement in the policy
+	statementQuery := "MATCH (p:AWSInlinePolicy) <- [:AttachedTo*2] - (s:AWSStatement) WHERE p.hash = $policy_hash RETURN s"
+	statementParams := map[string]any{"policy_hash": policyHash}
+
+	statementResults, err := RawCypherQuery(ctx, db, statementQuery, statementParams)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if statement == nil {
-		return nil, fmt.Errorf("statement not found")
+	statements := []map[string]any{}
+
+	for _, result := range statementResults {
+
+		var statement graph.Node
+		err = result.Map(&statement)
+		if err != nil {
+			continue
+		}
+
+		statementObject, err := GenerateStatementObject(ctx, db, statement)
+		if err != nil {
+			log.Printf("[!] error generating statement object: %s", err.Error())
+			continue
+		}
+
+		statements = append(statements, statementObject)
 	}
 
-	effect, _ := statement.Properties.Get("effect").String()
-	statementObject["effect"] = effect
+	policyObject := map[string]any{}
+	policyObject["Statement"] = statements
 
-	queryParams := map[string]any{"statement_id": statementID}
+	return policyObject, nil
+}
+
+func GenerateManagedPolicyObject(ctx context.Context, db graph.Database, policyId string) (map[string]any, error) {
+
+	statementQuery := "MATCH (p:AWSManagedPolicy) <- [:AttachedTo*3] - (s:AWSStatement) WHERE p.policyid = $policy_id RETURN s"
+	statementParams := map[string]any{"policy_id": policyId}
+
+	statementResults, err := RawCypherQuery(ctx, db, statementQuery, statementParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(statementResults) == 0 {
+		return nil, fmt.Errorf("no statements found for policy")
+	}
+
+	statements := []map[string]any{}
+
+	for _, result := range statementResults {
+
+		var statement graph.Node
+		err = result.Map(&statement)
+		if err != nil {
+			continue
+		}
+
+		statementObject, err := GenerateStatementObject(ctx, db, statement)
+		if err != nil {
+			log.Printf("[!] error generating statement object: %s", err.Error())
+			continue
+		}
+
+		statements = append(statements, statementObject)
+	}
+
+	policyObject := map[string]any{}
+	policyObject["Statement"] = statements
+
+	return policyObject, nil
+
+}
+
+func GetOperatorNameFromConditionNode(ctx context.Context, db graph.Database, condition graph.Node) (string, error) {
+	operator_query := "MATCH (c:AWSCondition) <- [:AttachedTo] - (o:AWSOperator) WHERE ID(c) = $id RETURN o.name"
+	operatorParams := map[string]any{"id": condition.ID}
+
+	operatorResults, err := RawCypherQuery(ctx, db, operator_query, operatorParams)
+
+	if err != nil {
+		return "", err
+	}
+
+	if len(operatorResults) == 0 {
+		return "", fmt.Errorf("no operator found for condition")
+	}
+
+	var operator string
+
+	for _, result := range operatorResults {
+		err = result.Map(&operator)
+		if err != nil {
+			continue
+		}
+	}
+
+	return operator, nil
+}
+
+func GetConditionValuesFromConditionKey(ctx context.Context, db graph.Database, conditionKey graph.Node) ([]string, error) {
+	query := "MATCH (ck:AWSConditionKey) <- [:AttachedTo] - (cv:AWSConditionValue) WHERE ID(ck) = $condition_key_id RETURN cv.name"
+	params := map[string]any{"condition_key_id": conditionKey.ID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	conditionValues := []string{}
+
+	for _, result := range results {
+		var conditionValue string
+		err = result.Map(&conditionValue)
+		if err != nil {
+			continue
+		}
+
+		conditionValues = append(conditionValues, conditionValue)
+	}
+
+	return conditionValues, nil
+}
+
+func GenerateConditionKeysObject(ctx context.Context, db graph.Database, condition graph.Node) (map[string]any, error) {
+	query := "MATCH (c:AWSCondition) <- [:AttachedTo] - (ck:AWSConditionKey) WHERE ID(c) = $condition_id RETURN ck "
+	params := map[string]any{"condition_id": condition.ID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	conditionKeys := map[string]any{}
+
+	for _, result := range results {
+		var conditionKey graph.Node
+		err = result.Map(&conditionKey)
+		if err != nil {
+			continue
+		}
+
+		conditionValues, err := GetConditionValuesFromConditionKey(ctx, db, conditionKey)
+		if err != nil {
+			log.Printf("[!] error getting condition values: %s", err.Error())
+			continue
+		}
+
+		conditionKeyName, err := conditionKey.Properties.Get("name").String()
+		if err != nil {
+			log.Printf("[!] error getting condition key name: %s", err.Error())
+			continue
+		}
+
+		conditionKeys[conditionKeyName] = conditionValues
+	}
+
+	return conditionKeys, nil
+
+}
+
+func GenerateStatementObject(ctx context.Context, db graph.Database, statement graph.Node) (map[string]any, error) {
+	statementObject := map[string]any{}
+
+	effect, _ := statement.Properties.Get("effect").String()
+	statementObject["Effect"] = effect
+
+	queryParams := map[string]any{"statement_id": statement.ID}
 
 	actionsQuery := "MATCH (s:AWSStatement) - [:Action] -> (a:AWSAction|AWSActionBlob) WHERE ID(s) = $statement_id RETURN a.name"
 	actionsResults, err := RawCypherQuery(ctx, db, actionsQuery, queryParams)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if len(actionsResults) == 0 {
+		notActionsQuery := "MATCH (s:AWSStatement) - [:NotAction] -> (a:AWSAction|AWSActionBlob) WHERE ID(s) = $statement_id RETURN a.name"
+		actionsResults, err = RawCypherQuery(ctx, db, notActionsQuery, queryParams)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(actionsResults) == 0 {
+		return nil, fmt.Errorf("no actions found for statement")
 	}
 
 	actionNames := []string{}
@@ -662,13 +823,26 @@ func GenerateStatementObject(ctx context.Context, db graph.Database, statementID
 		actionNames = append(actionNames, action)
 	}
 
-	statementObject["actions"] = actionNames
+	statementObject["Action"] = actionNames
 
-	resourcesQuery := "MATCH (s:AWSStatement) - [:Resource] -> (r:AWSResource|AWSResourceBlob) WHERE ID(s) = $statement_id RETURN r.arn"
+	resourcesQuery := "MATCH (s:AWSStatement) - [:Resource] -> (r:UniqueArn|AWSResourceBlob) WHERE ID(s) = $statement_id RETURN COALESCE(r.arn, r.name)"
 	resourcesResults, err := RawCypherQuery(ctx, db, resourcesQuery, queryParams)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if len(resourcesResults) == 0 {
+		notResourceQuery := "MATCH (s:AWSStatement) - [:NotResource] -> (r:UniqueArn|AWSResourceBlob) WHERE ID(s) = $statement_id RETURN COALESCE(r.arn, r.name)"
+		resourcesResults, err = RawCypherQuery(ctx, db, notResourceQuery, queryParams)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(resourcesResults) == 0 {
+		return nil, fmt.Errorf("no resources found for statement")
 	}
 
 	resources := []string{}
@@ -683,7 +857,40 @@ func GenerateStatementObject(ctx context.Context, db graph.Database, statementID
 		resources = append(resources, resource)
 	}
 
-	statementObject["resources"] = resources
+	statementObject["Resource"] = resources
+
+	conditionsQuery := "MATCH (s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = $statement_id RETURN c"
+	conditionsResults, err := RawCypherQuery(ctx, db, conditionsQuery, queryParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	conditions := map[string]any{}
+
+	for _, result := range conditionsResults {
+		var condition graph.Node
+		err = result.Map(&condition)
+		if err != nil {
+			continue
+		}
+
+		operatorName, err := GetOperatorNameFromConditionNode(ctx, db, condition)
+		if err != nil {
+			log.Printf("[!] error getting operator name: %s", err.Error())
+			continue
+		}
+
+		conditionkeys, err := GenerateConditionKeysObject(ctx, db, condition)
+		if err != nil {
+			log.Printf("[!] error generating condition object: %s", err.Error())
+			continue
+		}
+
+		conditions[operatorName] = conditionkeys
+	}
+
+	statementObject["Condition"] = conditions
 
 	return statementObject, nil
 }
@@ -877,7 +1084,7 @@ func GetPrincipalsOfPolicy(ctx context.Context, db graph.Database, policyID stri
 	return analyze.GetPrincipalsOfPolicy(ctx, db, node)
 }
 
-func GetPoliciesOfEntity(ctx context.Context, db graph.Database, propertyName string, id string) (graph.NodeSet, error) {
+func GetPoliciesOfEntity(ctx context.Context, db graph.Database, propertyName string, id string, kind graph.Kind) (graph.NodeSet, error) {
 
 	var node *graph.Node
 	var err error
@@ -898,7 +1105,7 @@ func GetPoliciesOfEntity(ctx context.Context, db graph.Database, propertyName st
 		return nil, err
 	}
 
-	nodes, err := analyze.GetAttachedKinds(ctx, db, node, graph.Kinds{aws.AWSManagedPolicy, aws.AWSInlinePolicy})
+	nodes, err := analyze.GetAttachedKinds(ctx, db, node, graph.Kinds{kind})
 	if err != nil {
 		return nil, err
 	}
