@@ -100,7 +100,9 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
       )}
       <HStack justifyContent="space-between" paddingY={2}>
         <h1>
-          <Text fontWeight="bold">{children}</Text>
+          <Text fontWeight="bold" fontSize="sm">
+            {children}
+          </Text>
         </h1>
         <IconButton
           aria-label="Expand Filter bar"

@@ -87,7 +87,7 @@ func ResolveAssumeRolePaths(assumeRoleSet *ActionPathSet, identityActionSet *Act
 
 	for _, condDenyPath := range *condDenyPathSet {
 		// Check if the condition is satisfied
-		if resolved, err := ResolveConditons(condDenyPath); err != nil {
+		if resolved, err := ResolveConditions(condDenyPath); err != nil {
 			return nil, err
 		} else if resolved {
 			resourceAllow.RemoveActionPathEntry(condDenyPath)
@@ -100,7 +100,7 @@ func ResolveAssumeRolePaths(assumeRoleSet *ActionPathSet, identityActionSet *Act
 
 	for _, condAllowPath := range *resourceCondAllow {
 		// Check if the condition is satisfied
-		if resolved, err := ResolveConditons(condAllowPath); err != nil {
+		if resolved, err := ResolveConditions(condAllowPath); err != nil {
 			continue
 		} else if resolved {
 			resourceAllow.Add(condAllowPath)
@@ -109,7 +109,7 @@ func ResolveAssumeRolePaths(assumeRoleSet *ActionPathSet, identityActionSet *Act
 
 	for _, condAllowPath := range *identityCondAllow {
 		// Check if the condition is satisfied
-		if resolved, err := ResolveConditons(condAllowPath); err != nil {
+		if resolved, err := ResolveConditions(condAllowPath); err != nil {
 			continue
 		} else if resolved {
 			identityAllow.Add(condAllowPath)
@@ -160,7 +160,7 @@ func ResolveResourceAgainstIdentityPolicies(resourceActionSet *ActionPathSet, id
 
 	for _, condDenyPath := range *condDenyPathSet {
 		// Check if the condition is satisfied
-		if resolved, err := ResolveConditons(condDenyPath); err != nil {
+		if resolved, err := ResolveConditions(condDenyPath); err != nil {
 			return nil, err
 		} else if resolved {
 			resourceAllow.RemoveActionPathEntry(condDenyPath)
@@ -176,7 +176,7 @@ func ResolveResourceAgainstIdentityPolicies(resourceActionSet *ActionPathSet, id
 
 	for _, condAllowPath := range *condAllowPathSet {
 		// Check if the condition is satisfied
-		if resolved, err := ResolveConditons(condAllowPath); err != nil {
+		if resolved, err := ResolveConditions(condAllowPath); err != nil {
 			continue
 		} else if resolved {
 			resolvedPaths.Add(condAllowPath)

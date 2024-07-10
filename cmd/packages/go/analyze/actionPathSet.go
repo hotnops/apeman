@@ -1,16 +1,13 @@
 package analyze
 
 import (
-	"github.com/hotnops/apeman/graphschema/aws"
 	"github.com/specterops/bloodhound/dawgs/graph"
 )
 
 type ActionPathSet []ActionPathEntry
 
 func (a *ActionPathSet) Add(actionPath ActionPathEntry) {
-	if !a.ContainsActionPath(actionPath) {
-		*a = append(*a, actionPath)
-	}
+	*a = append(*a, actionPath)
 }
 
 func (a *ActionPathSet) AddPathSet(actionPathSet ActionPathSet) {
@@ -130,39 +127,4 @@ func ActionPathSetToMap(actionSet ActionPathSet) PrincipalToActionMap {
 
 	}
 	return actionMap
-}
-
-func IdentityPolicyPathToActionPathSet(paths graph.PathSet) *ActionPathSet {
-	actionPathSets := new(ActionPathSet)
-	for _, path := range paths {
-		actionPathEntry := ActionPathEntry{}
-		actionPathEntry.Path = path
-		actionPathEntry.Statement = GetNodeFromPathByKind(path, aws.AWSStatement)
-		actionPathEntry.Effect, _ = actionPathEntry.Statement.Properties.Get("effect").String()
-		actionNode := GetNodeFromPathByKind(path, aws.AWSAction)
-		actionPathEntry.Action, _ = actionNode.Properties.Get("name").String()
-		principalNode, _ := GetPrincipalFromIdentityPath(path)
-		actionPathEntry.PrincipalID = principalNode.ID
-		actionPathEntry.PrincipalArn, _ = principalNode.Properties.Get("arn").String()
-		actionPathEntry.Conditions = GetNodesFromPathByKind(path, aws.AWSCondition)
-		actionPathSets.Add(actionPathEntry)
-	}
-	return actionPathSets
-}
-
-func ResourcePolicyPathToActionPathSet(paths graph.PathSet) *ActionPathSet {
-	actionPathSets := new(ActionPathSet)
-	for _, path := range paths {
-		actionPathEntry := ActionPathEntry{}
-		actionPathEntry.Path = path
-		actionPathEntry.Statement = GetNodeFromPathByKind(path, aws.AWSStatement)
-		actionPathEntry.Effect, _ = actionPathEntry.Statement.Properties.Get("effect").String()
-		actionNode := GetNodeFromPathByKind(path, aws.AWSAction)
-		actionPathEntry.Action, _ = actionNode.Properties.Get("name").String()
-		principalNode, _ := GetPrincipalFromResourcePath(path)
-		actionPathEntry.PrincipalArn, _ = principalNode.Properties.Get("arn").String()
-		actionPathEntry.Conditions = GetNodesFromPathByKind(path, aws.AWSCondition)
-		actionPathSets.Add(actionPathEntry)
-	}
-	return actionPathSets
 }

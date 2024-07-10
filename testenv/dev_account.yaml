@@ -1,0 +1,249 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Dev account
+
+Resources:
+  # IAM Roles
+  ABACRoleTest:
+    Type: "AWS::IAM::Role"
+    DependsOn: "ABACTeamSSMPolicy"
+    Properties:
+      RoleName: "ABACRoleTest"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ABACTeamSSMPolicy
+
+  TestRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "TestRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "AssumeTag"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "sts:AssumeRole"
+                Resource: "*"
+      Tags:
+        - Key: "team"
+          Value: "test"
+
+  TeamTagRoleAssume:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "TeamTagRoleAssume"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                "aws:PrincipalTag/team": "${aws:ResourceTag/team}"
+      Policies:
+        - PolicyName: "SSMAdmin"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ssm:*"
+                Resource: "*"
+      Tags:
+        - Key: "team"
+          Value: "test"
+
+  NotActionTestRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "NotActionTest"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMDeny"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Deny"
+                NotAction: "ssm:GetParameter"
+                Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
+        - PolicyName: "SSMAdmin"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ssm:*"
+                Resource: "*"
+
+  DenyTestRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "DenyTest"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMDeny"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Deny"
+                Action: "ssm:GetParameter"
+                Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
+        - PolicyName: "SSMAdmin"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ssm:*"
+                Resource: "*"
+
+  ArtifactoryDev:
+    Type: "AWS::IAM::Role"
+    DependsOn: "LambdaDev"
+    Properties:
+      RoleName: "ArtifactoryDev"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaDev"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMAdmin"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ssm:*"
+                Resource: "*"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+
+  LambdaDevAdmin:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "LambdaDevAdmin"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMDeny"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Deny"
+                Action: "ssm:GetParameter"
+                Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+
+  LambdaDev:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "LambdaDev"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMDeny"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Deny"
+                Action: "ssm:GetParameter"
+                Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+
+  MultipleConditionKeyPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "MultipleConditionKeyPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+            Condition:
+              ForAllValues:StringEquals:
+                "aws:PrincipalTag/department":
+                  - engineering
+                  - finance
+                "aws:PrincipalTag/team":
+                  - dev
+                  - test
+              ArnLike:
+                "aws:PrincipalArn":
+                  - arn:aws:iam::*:role/ABACRoleTest
+                  - arn:aws:iam::*:role/NotActionTest
+                  - arn:aws:iam::*:role/DenyTest
+
+  ABACTeamSSMPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "ABACTeamSSMPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "ssm:GetParameter"
+            Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
+            Condition:
+              StringEquals:
+                # Check if the resource tag equals the principal tag
+                "ssm:ResourceTag/team": "${aws:PrincipalTag/team}"
+
+  # SSM Parameters
+  SSMArtifactoryKey:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: "artifactory_key"
+      Description: "The key to publish to Artifactory"
+      Type: "String"
+      Value: "super_secret_api_key"
+
+  SSMTaggedArtifactoryKey:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: "artifactory_key_tagged"
+      Description: "The key to publish to Artifactory"
+      Type: "String"
+      Tags:
+        Team: "test"
+      Value: "super_secret_api_key"

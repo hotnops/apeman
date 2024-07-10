@@ -1,31 +1,18 @@
-import { useEffect, useState } from "react";
-import NodeService, { Node } from "../services/nodeService";
-import {
-  Accordion,
-  Table,
-  Tbody,
-  Text,
-  Td,
-  Tr,
-  Divider,
-  Card,
-} from "@chakra-ui/react";
-import RoleService, {
-  GetInboundRoles,
-  GetOutboundRoles,
-} from "../services/roleService";
-import AccordionList from "./AccordionList";
-import { Path, addPathToGraph } from "../services/pathService";
+import React, { useEffect, useState } from "react";
 import { useApemanGraph } from "../hooks/useApemanGraph";
+import { Path, addPathToGraph } from "../services/pathService";
+import nodeService, { Node } from "../services/nodeService";
+import { Accordion, Card, Table, Tbody, Td, Text, Tr } from "@chakra-ui/react";
 import PathAccordionList from "./PathAccordionList";
-import RSOPPanel from "./RSOPPanel";
+import AccordionList from "./AccordionList";
 import PermissionList from "./PermissionList";
+import UserService, { GetOutboundRoles } from "../services/userService";
 
 interface Props {
   node: Node;
 }
 
-const RoleOverviewPanel = ({ node }: Props) => {
+const UserOverviewPanel = ({ node }: Props) => {
   const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
   const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
   const [outboundPaths, setOutboundPaths] = useState<Path[]>([]);
@@ -37,13 +24,13 @@ const RoleOverviewPanel = ({ node }: Props) => {
 
     const fetchPolicies = async () => {
       try {
-        const { request } = RoleService.getRolePolicyNodes(
-          node.properties.map.roleid
+        const { request } = UserService.getUserPolicyNodes(
+          node.properties.map.userid
         );
         const res = await request;
 
         const policyRequests = res.data.nodes.map((node: Node) => {
-          const { request } = NodeService.getNodeByID(node.id.toString());
+          const { request } = nodeService.getNodeByID(node.id.toString());
           return request;
         });
 
@@ -64,18 +51,10 @@ const RoleOverviewPanel = ({ node }: Props) => {
       isMounted = false; // Prevent state updates if the component is unmounted
       // Add any necessary cleanup here
     };
-  }, []); // Add node.properties.map.roleid as a dependency if it can change
-
-  useEffect(() => {
-    const { request, cancel } = GetInboundRoles(node.properties.map.roleid);
-    request.then((res) => {
-      setInboundPaths(res.data.map((path: Path) => path));
-    });
-    return cancel;
   }, []);
 
   useEffect(() => {
-    const { request, cancel } = GetOutboundRoles(node.properties.map.roleid);
+    const { request, cancel } = GetOutboundRoles(node.properties.map.userid);
     request.then((res) => {
       setOutboundPaths(res.data.map((path: Path) => path));
     });
@@ -85,29 +64,29 @@ const RoleOverviewPanel = ({ node }: Props) => {
   return (
     <>
       <Card>
-        <Table size={"xs"} variant="unstyled">
+        <Table size={"xs"} variant="unstytled">
           <Tbody>
-            <Tr key="rolename">
+            <Tr key="username">
               <Td>
                 <Text fontSize="sm" as="b" padding="5px">
-                  Role Name
+                  User Name
                 </Text>
               </Td>
               <Td>
                 <Text fontSize="sm" textAlign="right" padding="5px">
-                  {node.properties.map.rolename}
+                  {node.properties.map.name}
                 </Text>
               </Td>
             </Tr>
-            <Tr key="roleid">
+            <Tr key="userid">
               <Td>
                 <Text fontSize="sm" as="b" padding="5px">
-                  Role ID
+                  User ID
                 </Text>
               </Td>
               <Td>
                 <Text fontSize="sm" textAlign="right" padding="5px">
-                  {node.properties.map.roleid}
+                  {node.properties.map.userid}
                 </Text>
               </Td>
             </Tr>
@@ -129,14 +108,6 @@ const RoleOverviewPanel = ({ node }: Props) => {
       <Card marginY="25px">
         <Accordion allowMultiple={true} width="100%">
           <PathAccordionList
-            paths={inboundPaths}
-            name="Inbound Principals"
-            pathFunction={(n: Path) => {
-              addPathToGraph(n, addNode, addEdge);
-            }}
-            pathLabelFunction={(n: Path) => n.Nodes[0].properties.map.arn}
-          ></PathAccordionList>
-          <PathAccordionList
             paths={outboundPaths}
             name="Outbound Principals"
             pathFunction={(n: Path) => {
@@ -156,7 +127,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
       </Card>
       <Card>
         <PermissionList
-          endpoint={"roles/" + node.properties.map.roleid + "/rsop"}
+          endpoint={"users/" + node.properties.map.userid + "/rsop"}
           resourceId={() => node.id}
         >
           Resultant Set Of Policy
@@ -166,4 +137,4 @@ const RoleOverviewPanel = ({ node }: Props) => {
   );
 };
 
-export default RoleOverviewPanel;
+export default UserOverviewPanel;

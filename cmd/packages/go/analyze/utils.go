@@ -2,8 +2,10 @@ package analyze
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"github.com/hotnops/apeman/awsconditions"
 	"github.com/specterops/bloodhound/dawgs/graph"
 )
 
@@ -32,7 +34,79 @@ func RemovePathByIndex(g *graph.PathSet, index int) {
 	(*g) = append((*g)[:index], (*g)[index+1:]...)
 }
 
-func ResolveConditons(entry ActionPathEntry) (bool, error) {
+func ResolvePolicyVariable(entry ActionPathEntry, policyVariable string) (string, error) {
+	// Extract the variable between the ${} delimeter
+	// Trim anything to right of / if it exists
+
+	// If the context key has a forward slash, take the first part
+	parts := strings.Split(policyVariable, "/")
+	name := parts[0]
+
+	contextResolveFunction, ok := ContextKeyFunctionMap[name]
+	if !ok {
+		return "", fmt.Errorf("context key %s not found", name)
+	}
+	return contextResolveFunction(entry, policyVariable)
+
+}
+
+func ResolveConditionVariables(entry ActionPathEntry, condition awsconditions.AWSCondition) (map[string][]string, error) {
+	// Resolve the policy variable to the actual value
+	// The policy variable is the key in the condition
+	// The value is the value in the condition
+	// The condition is the condition in the policy
+	// The entry is the path entry
+
+	resolvedConditionKeys := make(map[string][]string)
+	var err error
+
+	for conditionKey, conditionValues := range condition.ConditionKeys {
+		// If condition key contains ${}
+		conditionKey, err = ResolvePolicyVariable(entry, conditionKey)
+		if err != nil {
+			return nil, err
+		}
+		resolvedConditionValues := []string{}
+		for _, conditionValue := range conditionValues {
+			if strings.Contains(conditionValue, "${") {
+				// Remove the value between the ${}
+				trimmedValue := strings.Trim(conditionValue, "${")
+				trimmedValue = strings.Trim(trimmedValue, "}")
+
+				conditionValue, err = ResolvePolicyVariable(entry, trimmedValue)
+				if err != nil {
+					log.Printf("Error resolving policy variable: %s", err.Error())
+					continue
+				}
+			}
+			resolvedConditionValues = append(resolvedConditionValues, conditionValue)
+		}
+
+		resolvedConditionKeys[conditionKey] = resolvedConditionValues
+	}
+
+	return resolvedConditionKeys, nil
+}
+
+func ResolveConditions(entry ActionPathEntry) (bool, error) {
+	// "The difference between single-valued and multivalued context keys depends on the number of values
+	// in the request context, not the number of values in the policy condition."
+
+	conditions := entry.Conditions
+	var err error
+
+	for _, condition := range conditions {
+		// Each operator is AND'd together, so if one is fales, the condition
+		// set fails
+		condition.ConditionKeys, err = ResolveConditionVariables(entry, condition)
+		if err != nil {
+			return false, err
+		}
+		if !awsconditions.SolveCondition(&condition) {
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 

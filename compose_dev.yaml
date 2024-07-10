@@ -30,7 +30,7 @@ services:
 
   apeman-frontend:
     image: node:20-alpine
-    command: sh -c "yarn install && yarn vite"
+    command: sh -c "npm i --force && npm run dev"
     volumes:
       - ./ui/apeman-ui:/app
     working_dir: /app

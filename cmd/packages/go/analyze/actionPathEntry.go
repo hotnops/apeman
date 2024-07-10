@@ -3,19 +3,22 @@ package analyze
 import (
 	"fmt"
 
+	"github.com/hotnops/apeman/awsconditions"
 	"github.com/specterops/bloodhound/dawgs/graph"
 )
 
 type ActionPathEntry struct {
-	PrincipalID       graph.ID      `json:"principal_id"`
-	PrincipalArn      string        `json:"principal_arn"`
-	IsPrincipalDirect bool          `json:"is_principal_direct"`
-	ResourceArn       string        `json:"resource_arn"`
-	Action            string        `json:"action"`
-	Path              graph.Path    `json:"path"`
-	Effect            string        `json:"effect"`
-	Statement         *graph.Node   `json:"statement"`
-	Conditions        graph.NodeSet `json:"conditions"`
+	PrincipalID       graph.ID                     `json:"principal_id"`
+	PrincipalTags     map[string]string            `json:"principal_tags"`
+	PrincipalArn      string                       `json:"principal_arn"`
+	IsPrincipalDirect bool                         `json:"is_principal_direct"`
+	ResourceArn       string                       `json:"resource_arn"`
+	ResourceTags      map[string]string            `json:"resource_tags"`
+	Action            string                       `json:"action"`
+	Path              graph.Path                   `json:"path"`
+	Effect            string                       `json:"effect"`
+	Statement         *graph.Node                  `json:"statement"`
+	Conditions        []awsconditions.AWSCondition `json:"conditions"`
 }
 
 func (a *ActionPathEntry) IsEqual(other ActionPathEntry) bool {
