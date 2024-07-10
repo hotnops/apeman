@@ -94,7 +94,7 @@ func get_service_metadata(url string) (*PolicyEditorConfig, error) {
 	return &config, nil
 }
 
-func get_services_json(url string) (*Root, error) {
+func get_services_json_href(url string) []string {
 
 	//web request
 	response, err := http.Get(url)
@@ -112,14 +112,21 @@ func get_services_json(url string) (*Root, error) {
 		fmt.Println("Error with unmarshal:", err)
 	}
 
+	var hrefList []string
+
 	for _, data := range contents.Contents {
 		//fmt.Println(data.Contents)
 		for _, y := range data.Contents {
-			printSubsections(y)
+			//printSubsections(y)
+			for _, subContent := range y.Contents {
+				hrefList = append(hrefList, subContent.Href)
+				//fmt.Println(subContent.Href)
+			}
+
 		}
 	}
 
-	return &contents, nil
+	return hrefList
 
 }
 
@@ -140,46 +147,43 @@ func get_service_dict(link string) {
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	error_check(err)
 
-	//table #may change with each html response so i should figure out how to add programatically
-	doc.Find("table#w43aab5b9e1671c11c13").Each(func(column int, tr *goquery.Selection) {
+	//table #may change with each html response so I should figure out how to add programatically
+	doc.Find("table").Eq(0).Each(func(column int, tr *goquery.Selection) {
 		tr.Find("tr").Each(func(col int, td *goquery.Selection) {
+			table_length := td.Find("td, th").Length()
 			td.Find("td").Each(func(col int, td *goquery.Selection) {
-			
-			
-			if col == 0 && td.Text() != ""{
-				if (strings.Contains(td.Text(),"sampling-rule") || strings.Contains(td.Text(),"group")) {
-					fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
 
-				}else{
-				fmt.Printf("Actions \t %s\n",strings.TrimSpace(td.Text()))
+				if col == 0 {
+					if table_length == 3 {
+						fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+					} else {
+						fmt.Printf("Actions:  %s\n", strings.TrimSpace(td.Text()))
+					}
+
+				} else if col == 1 {
+					if table_length == 3 {
+						fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+					} else {
+						fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+					}
+
+				} else if col == 2 {
+					fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
+
+				} else if col == 3 {
+					fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+
+				} else if col == 4 {
+					fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+
+				} else {
+					fmt.Printf("\n")
 				}
-
-			}else if col == 1 && td.Text() != "" {
-				if(strings.Contains(td.Text(),"aws:")){
-					fmt.Printf("Condition Keys \t %s\n",strings.TrimSpace(td.Text()))
-
-				}else{
-					fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
-				}
-
-			} else if col == 2 && td.Text() != "" {
-				fmt.Printf("Description \t %s\n",strings.TrimSpace(td.Text()))
-
-			} else if col == 3 {
-				fmt.Printf("Resource Type \t %s\n",strings.TrimSpace(td.Text()))
-
-			} else if col == 4 {
-				fmt.Printf("Condition Keys \t %s\n",strings.TrimSpace(td.Text()))
-
-			 }else{
-				fmt.Printf("\n")
-			}
 			})
-			fmt.Printf("\n")
-		})
-		
-	})
 
+		})
+
+	})
 
 }
 
@@ -209,18 +213,20 @@ func response_error_check(err error) {
 func main() {
 	//service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
 	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
-	//service_json_url := base_url + "toc-contents.json"
+	service_json_url := base_url + "toc-contents.json"
 
+	//services_metadata, err := get_service_metadata(service_url)
+	//error_check(err)
 	/*
-		services_metadata, err := get_service_metadata(service_url)
-		error_check(err)
-
 		for _, data := range services_metadata.ServiceMap {
-			fmt.Println(data.HasResource)
+			fmt.Println(data.Actions)
 		}
-
-		get_services_json(service_json_url)
 	*/
-	test_url := base_url + "list_awsx-ray.html"
-	get_service_dict(test_url)
+
+	for _, links := range get_services_json_href(service_json_url) {
+
+		get_service_dict(base_url + links)
+	}
+
+	get_service_dict("https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsapp2container.html")
 }
