@@ -58,11 +58,27 @@ export function GetRoleRSOP(roleId: string) {
   };
 }
 
+
 class RoleService {
-  getRolePolicyNodes(roleid: string) {
+  getRoleManagedPolicyNodes(roleid: string) {
     const controller = new AbortController();
 
-    const request = apiClient.get(BASE_PATH + "/" + roleid + "/policies", {
+    const request = apiClient.get(BASE_PATH + "/" + roleid + "/managedpolicies", {
+      signal: controller.signal,
+    });
+
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
+
+  getRoleInlinePolicyNodes(roleid: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get(BASE_PATH + "/" + roleid + "/inlinepolicies", {
       signal: controller.signal,
     });
 

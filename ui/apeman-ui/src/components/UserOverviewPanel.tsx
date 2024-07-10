@@ -7,6 +7,7 @@ import PathAccordionList from "./PathAccordionList";
 import AccordionList from "./AccordionList";
 import PermissionList from "./PermissionList";
 import UserService, { GetOutboundRoles } from "../services/userService";
+import InlinePolicy from "./InlinePolicy";
 
 interface Props {
   node: Node;
@@ -124,6 +125,7 @@ const UserOverviewPanel = ({ node }: Props) => {
             name="Attached Policies"
           ></AccordionList>
         </Accordion>
+        <InlinePolicy principalNode={node} />
       </Card>
       <Card>
         <PermissionList
