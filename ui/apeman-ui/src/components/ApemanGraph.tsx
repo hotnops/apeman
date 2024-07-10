@@ -112,9 +112,7 @@ const ApemanGraph = () => {
         });
       }}
       onEdgeClick={(e: InternalGraphEdge) => {
-        console.log("Edge click");
         getRelationshipByID(e.id).request.then((res) => {
-          console.log(res.data);
           if (res.data.Properties.map.layer.toString() == "2") {
             setActiveElement(res.data);
           }

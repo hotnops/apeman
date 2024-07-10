@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/hotnops/apeman/analyze"
+	"github.com/hotnops/apeman/awsconditions"
 	"github.com/hotnops/apeman/graphschema/aws"
 	"github.com/specterops/bloodhound/dawgs/graph"
 	"github.com/specterops/bloodhound/dawgs/ops"
@@ -161,6 +162,49 @@ func GetAWSAccountServices(ctx context.Context, db graph.Database, accountID str
 
 }
 
+func PopulateTags(ctx context.Context, db graph.Database, entry *analyze.ActionPathEntry) {
+	// Get tags for the principal and resource
+	principalTags := map[string]string{}
+	resourceTags := map[string]string{}
+	query := "MATCH (a:UniqueArn) <- [:AttachedTo] - (t:AWSTag) WHERE a.arn = $arn RETURN t "
+	params := map[string]any{"arn": entry.PrincipalArn}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+	if err != nil {
+		log.Printf("[!] Error getting tags: %s", err.Error())
+	}
+	for _, result := range results {
+		var tag graph.Node
+		err = result.Map(&tag)
+		if err != nil {
+			continue
+		}
+		tagKey, _ := tag.Properties.Get("key").String()
+		tagValue, _ := tag.Properties.Get("value").String()
+		principalTags[tagKey] = tagValue
+	}
+
+	entry.PrincipalTags = principalTags
+
+	params = map[string]any{"arn": entry.ResourceArn}
+	results, err = RawCypherQuery(ctx, db, query, params)
+	if err != nil {
+		log.Printf("[!] Error getting tags: %s", err.Error())
+	}
+	for _, result := range results {
+		var tag graph.Node
+		err = result.Map(&tag)
+		if err != nil {
+			continue
+		}
+		tagKey, _ := tag.Properties.Get("key").String()
+		tagValue, _ := tag.Properties.Get("value").String()
+		resourceTags[tagKey] = tagValue
+	}
+
+	entry.ResourceTags = resourceTags
+}
+
 func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database, roleId string) (*analyze.ActionPathSet, error) {
 	// First, get all the principals that are trusted to assume this role
 	query := "MATCH p=(a:AWSRole) <- [:AttachedTo] - (:AWSAssumeRolePolicy) <- [:AttachedTo] - (s:AWSStatement) - [:Principal|ExpandsTo*1..2] -> (b:AWSRole|AWSUser) WHERE a.roleid = $roleid AND (s) - [:Action|ExpandsTo*1..2] -> (:AWSAction {name:'sts:assumerole'}) " +
@@ -213,7 +257,7 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		effect, _ := statement.Properties.Get("effect").String()
 
 		if conditionExists {
-			conditions, err := GetConditionPathsFromStatement(ctx, db, statement.ID)
+			conditions, err := GetConditionsFromStatement(ctx, db, statement.ID)
 			if err != nil {
 				log.Printf("[!] Error getting conditions: %s", err.Error())
 				continue
@@ -228,6 +272,9 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		newActionPathEntry.Statement = &statement
 		newActionPathEntry.Action = "sts:assumerole"
 		newActionPathEntry.IsPrincipalDirect = !isPrinExpanded
+		if conditionExists {
+			PopulateTags(ctx, db, &newActionPathEntry)
+		}
 		resourcePathSet.Add(newActionPathEntry)
 	}
 
@@ -366,7 +413,7 @@ func CreateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
 	return nil
 }
 
-func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalNode *graph.Node) (*analyze.ActionPathSet, error) {
+func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalNode *graph.Node) (analyze.ActionPathSet, error) {
 	// First, get all resources that this principal has a path to, regardless of deny or allow
 	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSManagedPolicy|AWSInlinePolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b:UniqueArn) " +
 		"WHERE ID(a) = %d AND a.account_id = b.account_id  " +
@@ -415,15 +462,15 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 		entry.Action = action
 		entry.Effect = effect
 		if conditionExists {
-			conditions, err := GetConditionPathsFromStatement(ctx, db, statement.ID)
+			conditions, err := GetConditionsFromStatement(ctx, db, statement.ID)
 			if err != nil {
 				log.Printf("[!] Error getting conditions: %s", err.Error())
 				continue
 			}
 			entry.Conditions = conditions
+		} else {
+			entry.Conditions = nil
 		}
-
-		entry.Conditions = nil
 		actionPathSet.Add(entry)
 	}
 	if err != nil {
@@ -431,7 +478,7 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 		return nil, err
 	}
 
-	return &actionPathSet, nil
+	return actionPathSet, nil
 
 }
 
@@ -457,7 +504,78 @@ func GetResourcePathFromStatementToArn(ctx context.Context, db graph.Database, s
 	return pathSet, nil
 }
 
-func GetConditionPathsFromStatement(ctx context.Context, db graph.Database, statementID graph.ID) (graph.NodeSet, error) {
+func GetConditionKeysFromConditionNode(ctx context.Context, db graph.Database, conditionNode *graph.Node) (map[string][]string, error) {
+	conditionKeys := map[string][]string{}
+	query := "MATCH (c:AWSCondition) <- [:AttachedTo] - (ck:AWSConditionKey) <- [:AttachedTo] - (cv:AWSConditionValue) WHERE ID(c) = $id RETURN ck, cv"
+
+	params := map[string]any{"id": conditionNode.ID}
+	results, err := RawCypherQuery(ctx, db, query, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		var conditionKey graph.Node
+		var conditionValue graph.Node
+		err = result.Map(&conditionKey)
+		if err != nil {
+			continue
+		}
+		err = result.Map(&conditionValue)
+		if err != nil {
+			continue
+		}
+		conditionKeyStr, _ := conditionKey.Properties.Get("name").String()
+		conditionValueStr, _ := conditionValue.Properties.Get("name").String()
+
+		if _, ok := conditionKeys[conditionKeyStr]; !ok {
+			conditionKeys[conditionKeyStr] = []string{}
+		}
+		conditionKeys[conditionKeyStr] = append(conditionKeys[conditionKeyStr], conditionValueStr)
+	}
+
+	return conditionKeys, nil
+}
+
+func GetOperatorFromConditionNode(ctx context.Context, db graph.Database, conditionNode *graph.Node) (string, error) {
+	query := "MATCH (c:AWSCondition) <- [:AttachedTo] - (o:AWSOperator) WHERE ID(c) = $id RETURN o"
+	params := map[string]any{"id": conditionNode.ID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+	if err != nil {
+		return "", err
+	}
+
+	var operator graph.Node
+	for _, result := range results {
+		err = result.Map(&operator)
+		if err != nil {
+			continue
+		}
+	}
+
+	return operator.Properties.Get("name").String()
+
+}
+
+func PopulateConditionStructFromConditionNode(ctx context.Context, db graph.Database, conditionNode *graph.Node) (awsconditions.AWSCondition, error) {
+	err := error(nil)
+	awscondition := awsconditions.AWSCondition{}
+	awscondition.ResolvedVariables = make(map[string]string)
+	awscondition.Operator, err = GetOperatorFromConditionNode(ctx, db, conditionNode)
+	if err != nil {
+		return awscondition, err
+	}
+	awscondition.ConditionKeys, err = GetConditionKeysFromConditionNode(ctx, db, conditionNode)
+	if err != nil {
+		return awscondition, err
+	}
+	return awscondition, nil
+}
+
+func GetConditionsFromStatement(ctx context.Context, db graph.Database, statementID graph.ID) ([]awsconditions.AWSCondition, error) {
+	conditions := []awsconditions.AWSCondition{}
 	query := "MATCH (s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = %d RETURN c"
 	formatted_query := fmt.Sprintf(query, statementID)
 
@@ -466,7 +584,7 @@ func GetConditionPathsFromStatement(ctx context.Context, db graph.Database, stat
 		return nil, err
 	}
 
-	conditions := graph.NewNodeSet()
+	conditionNodes := graph.NewNodeSet()
 
 	for _, result := range results {
 		var condition graph.Node
@@ -474,7 +592,16 @@ func GetConditionPathsFromStatement(ctx context.Context, db graph.Database, stat
 		if err != nil {
 			continue
 		}
-		conditions.Add(&condition)
+		conditionNodes.Add(&condition)
+	}
+
+	for _, conditionNode := range conditionNodes.Slice() {
+		condition, err := PopulateConditionStructFromConditionNode(ctx, db, conditionNode)
+		if err != nil {
+			log.Printf("[!] Error populating condition struct: %s", err.Error())
+			continue
+		}
+		conditions = append(conditions, condition)
 	}
 
 	return conditions, nil
@@ -488,6 +615,77 @@ func GetPathsWithStatement(paths graph.PathSet, statement *graph.Node) graph.Pat
 		}
 	}
 	return pathsWithStatement
+}
+
+func GenerateStatementObject(ctx context.Context, db graph.Database, statementID graph.ID) (map[string]any, error) {
+	statementObject := map[string]any{}
+	var statement *graph.Node
+
+	err := db.ReadTransaction(ctx, func(tx graph.Transaction) error {
+		if fetchedNode, err := ops.FetchNode(tx, statementID); err != nil {
+			return err
+		} else {
+			statement = fetchedNode
+			return nil
+		}
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if statement == nil {
+		return nil, fmt.Errorf("statement not found")
+	}
+
+	effect, _ := statement.Properties.Get("effect").String()
+	statementObject["effect"] = effect
+
+	queryParams := map[string]any{"statement_id": statementID}
+
+	actionsQuery := "MATCH (s:AWSStatement) - [:Action] -> (a:AWSAction|AWSActionBlob) WHERE ID(s) = $statement_id RETURN a.name"
+	actionsResults, err := RawCypherQuery(ctx, db, actionsQuery, queryParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	actionNames := []string{}
+
+	for _, result := range actionsResults {
+		var action string
+		err = result.Map(&action)
+		if err != nil {
+			continue
+		}
+
+		actionNames = append(actionNames, action)
+	}
+
+	statementObject["actions"] = actionNames
+
+	resourcesQuery := "MATCH (s:AWSStatement) - [:Resource] -> (r:AWSResource|AWSResourceBlob) WHERE ID(s) = $statement_id RETURN r.arn"
+	resourcesResults, err := RawCypherQuery(ctx, db, resourcesQuery, queryParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []string{}
+
+	for _, result := range resourcesResults {
+		var resource string
+		err = result.Map(&resource)
+		if err != nil {
+			continue
+		}
+
+		resources = append(resources, resource)
+	}
+
+	statementObject["resources"] = resources
+
+	return statementObject, nil
 }
 
 func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Context, db graph.Database, roleId string, actionName string, sourceArns []string) (*analyze.ActionPathSet, error) {
@@ -544,7 +742,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		effect, _ := statement.Properties.Get("effect").String()
 
 		if conditionExists {
-			conditions, err := GetConditionPathsFromStatement(ctx, db, statement.ID)
+			conditions, err := GetConditionsFromStatement(ctx, db, statement.ID)
 			if err != nil {
 				log.Printf("[!] Error getting conditions: %s", err.Error())
 				continue
@@ -558,6 +756,9 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
+		if conditionExists {
+			PopulateTags(ctx, db, &newActionPathEntry)
+		}
 		actionPathSet.Add(newActionPathEntry)
 	}
 
@@ -617,7 +818,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Data
 		effect, _ := statement.Properties.Get("effect").String()
 
 		if conditionExists {
-			conditions, err := GetConditionPathsFromStatement(ctx, db, statement.ID)
+			conditions, err := GetConditionsFromStatement(ctx, db, statement.ID)
 			if err != nil {
 				log.Printf("[!] Error getting conditions: %s", err.Error())
 				continue
@@ -629,6 +830,9 @@ func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Data
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
+		if conditionExists {
+			PopulateTags(ctx, db, &newActionPathEntry)
+		}
 		actionPathSet.Add(newActionPathEntry)
 	}
 

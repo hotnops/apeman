@@ -64,7 +64,9 @@ const PermissionItem = ({ name, actions, resourceId }: Props) => {
       <h2>
         <AccordionButton>
           <Box as="span" flex="1" textAlign="left">
-            <Text fontWeight="bold">{name}</Text>
+            <Text fontWeight="bold" fontSize="xs">
+              {name}
+            </Text>
           </Box>
           <AccordionIcon />
         </AccordionButton>
@@ -74,7 +76,9 @@ const PermissionItem = ({ name, actions, resourceId }: Props) => {
           {actions.map((action) => (
             <ListItem>
               <HStack width="100%">
-                <Text width="90%">{action}</Text>
+                <Text width="90%" fontSize="xs">
+                  {action}
+                </Text>
                 <Button
                   onClick={() =>
                     graphPermissionPathWithAction(name, resourceId, action)

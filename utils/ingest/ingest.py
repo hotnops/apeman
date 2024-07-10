@@ -15,6 +15,7 @@ from neo4j import GraphDatabase
 import arn
 
 condition_map = {}
+condition_key_map = {}
 condition_value_map = {}
 statements_map = {}
 permission_documents_map = {}
@@ -35,10 +36,8 @@ hash_to_hash_rels = {}
 hash_to_arn_rels = {}
 arn_to_arn_rels = {}
 member_of_rels = {}
-condition_key_to_condition_rels = {}
 operator_to_condition_rels = {}
 multi_operator_to_condition_rels = {}
-condition_value_to_condition_rels = {}
 statement_to_action_rels = {}
 statement_to_not_action_rels = {}
 statement_to_resource_rels = {}
@@ -51,6 +50,7 @@ statement_to_principal_rels = {}
 statement_to_principal_blob_rels = {}
 statement_to_uniquename_rels = {}
 condition_key_to_resource_rels = {}
+condition_value_to_key_rels = {}
 
 def get_hash(item_to_hash: dict):
     return xxhash.xxh128_hexdigest(json.dumps(item_to_hash, sort_keys=True))
@@ -88,42 +88,26 @@ def process_tags(principal):
 
 
 def process_condition(operator: str, condition_keyvalue: dict):
-    condition_dict = {
-        "operator": operator,
-    }
-    for key, value in condition_keyvalue.items():
-        condition_dict["condition_key"] = key.lower()
-        condition_dict["condition_value"] = value
-
-    condition_hash = get_hash(condition_dict)
+    condition_hash = get_hash({operator: condition_keyvalue})
+    # {Operator: {ConditionKey: [ConditionValue]}}
 
     if condition_hash not in condition_map:
-        condition_dict['hash'] = condition_hash
-        condition_map[condition_hash] = condition_dict
-
-    # Map the operator to the condition
-    if operator.startswith("foranyvalue") or\
-            operator.startswith("forallvalues"):
-        multi_operator, operator = operator.split(":", 1)
-        add_to_rels(multi_operator_to_condition_rels, multi_operator,
-                    condition_hash)
+        condition_map[condition_hash] = {"hash": condition_hash, 'sid': condition_keyvalue.get('sid', "")}
 
     add_to_rels(operator_to_condition_rels, operator, condition_hash)
-    #Map the condition key to the condition
+    
     for condition_key, condition_values in condition_keyvalue.items():
-        condition_key = condition_key.lower()
-        add_to_rels(condition_key_to_condition_rels, condition_key,
-                    condition_hash)
-        if not type(condition_values) == list:
-            condition_values = [condition_values]
+        condition_key_hash = get_hash({condition_key: condition_values})
+        if condition_key_hash not in condition_key_map:
+            condition_key_map[condition_key_hash] = {'hash': condition_key_hash, 'name': condition_key}
+    
+        add_to_rels(hash_to_hash_rels, condition_key_hash, condition_hash)
 
+        if type(condition_values) != list:
+            condition_values = [condition_values]
         for condition_value in condition_values:
-            if not condition_value:
-                condition_value = "empty"
             process_condition_value(condition_value)
-            # Condition value to condition
-            add_to_rels(condition_value_to_condition_rels, condition_value,
-                        condition_hash)
+            add_to_rels(condition_value_to_key_rels, condition_value, condition_key_hash)
 
     return condition_hash
 
@@ -627,6 +611,8 @@ def load_csvs_into_database():
                    ["hash", "version", "sid"])
         ingest_csv(session, "conditions.csv", "AWSCondition:UniqueHash",
                    ["hash", "sid"])
+        ingest_csv(session, "conditionkeys.csv", "AWSConditionKey:UniqueHash",
+                   ["hash", "name"])
         ingest_csv(session, "conditionvalues.csv", "AWSConditionValue:UniqueName",
                    ["name"])
         ingest_csv(session, "groups.csv", "AWSGroup:UniqueArn",
@@ -672,14 +658,6 @@ def load_csvs_into_database():
                              "arn", "AttachedTo", "UniqueArn", "arn")
         ingest_relationships(session, "member_of_rels.csv", "AWSUser", "arn",
                              "MemberOf", "AWSGroup", "arn")
-        ingest_relationships(session, "condition_key_to_condition_rels.csv",
-                             "AWSConditionKey:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "condition_value_to_condition_rels.csv",
-                             "AWSConditionValue:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
         ingest_relationships(session, "operator_to_condition_rels.csv",
                              "AWSOperator:UniqueName", "name",
                              "AttachedTo",
@@ -720,10 +698,6 @@ def load_csvs_into_database():
                              "AWSStatement:UniqueHash", "hash",
                              "NotResource",
                              "AWSResourceBlob:UniqueName", "name")
-        ingest_relationships(session, "condition_key_to_resource_rels.csv",
-                             "AWSConditionKey:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSResourceBlob:UniqueName", "name")
         
         ingest_relationships(session, "statement_to_principal_arn.csv",
                                 "AWSStatement:UniqueHash", "hash",
@@ -737,6 +711,11 @@ def load_csvs_into_database():
                                 "AWSStatement:UniqueHash", "hash",
                                 "Principal",
                                 "AWSPrincipalBlob:UniqueName", "name")
+        
+        ingest_relationships(session, "condition_value_to_condition_keys_rels.csv",
+                                "AWSConditionValue:UniqueName", "name",
+                                "AttachedTo",
+                                "AWSConditionKey:UniqueHash", "hash")
                              
         try:
             ingest_resources(session, "arns.csv")
@@ -761,9 +740,6 @@ def write_rels_to_csv(outputdir):
     hash_to_arn_filename = os.path.join(outputdir, "hash_to_arn_rels.csv")
     arn_to_arn_rels_filename = os.path.join(outputdir, "arn_to_arn_rels.csv")
     member_of_rels_filename = os.path.join(outputdir, "member_of_rels.csv")
-    ck_to_condition_rels_filename = os.path.join(
-        outputdir,
-        "condition_key_to_condition_rels.csv")
 
     operator_to_condition_rels_filename = os.path.join(
         outputdir,
@@ -772,9 +748,9 @@ def write_rels_to_csv(outputdir):
         output_dir,
         "multi_operator_to_condition_rels.csv"
     )
-    condition_value_to_condition_rels_filename = os.path.join(
+    condition_value_to_condition_key_rels_filename = os.path.join(
         outputdir,
-        "condition_value_to_condition_rels.csv"
+        "condition_value_to_condition_keys_rels.csv"
     )
     statement_to_action_rels_filename = os.path.join(
         outputdir,
@@ -831,6 +807,11 @@ def write_rels_to_csv(outputdir):
         "statement_to_principal_blob_rels.csv"
     )
 
+    condition_value_to_condition_key_rels_filename = os.path.join(
+        outputdir,
+        "condition_value_to_condition_keys_rels.csv"
+    )
+
     write_to_csv(hash_to_hash_filename,
                  rels_to_unique_list(hash_to_hash_rels), fields)
     write_to_csv(hash_to_arn_filename,
@@ -839,17 +820,12 @@ def write_rels_to_csv(outputdir):
                  rels_to_unique_list(arn_to_arn_rels), fields)
     write_to_csv(member_of_rels_filename,
                  rels_to_unique_list(member_of_rels), fields)
-    write_to_csv(ck_to_condition_rels_filename,
-                 rels_to_unique_list(condition_key_to_condition_rels),
-                 fields)
+
     write_to_csv(operator_to_condition_rels_filename,
                  rels_to_unique_list(operator_to_condition_rels),
                  fields)
     write_to_csv(multi_operator_to_condition_rels_filename,
                  rels_to_unique_list(multi_operator_to_condition_rels),
-                 fields)
-    write_to_csv(condition_value_to_condition_rels_filename,
-                 rels_to_unique_list(condition_value_to_condition_rels),
                  fields)
     write_to_csv(statement_to_action_rels_filename,
                  rels_to_unique_list(statement_to_action_rels),
@@ -888,6 +864,10 @@ def write_rels_to_csv(outputdir):
     
     write_to_csv(statement_to_principal_blob_rels_filename,
                     rels_to_unique_list(statement_to_principal_blob_rels),
+                    fields)
+    
+    write_to_csv(condition_value_to_condition_key_rels_filename,
+                    rels_to_unique_list(condition_value_to_key_rels),
                     fields)
 
 
@@ -957,6 +937,10 @@ def write_nodes_to_csv(output_dir: str):
     conditions_filename = os.path.join(output_dir, "conditions.csv")
     condition_fields = ['hash', 'sid']
     write_to_csv(conditions_filename, condition_map, condition_fields)
+
+    condition_key_filename = os.path.join(output_dir, "conditionkeys.csv")
+    condition_key_fields = ['hash', 'name']
+    write_to_csv(condition_key_filename, condition_key_map, condition_key_fields)
 
     condition_value_filename = os.path.join(output_dir, "conditionvalues.csv")
     write_to_csv(condition_value_filename, condition_value_map, ['name'])

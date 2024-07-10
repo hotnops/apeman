@@ -8,6 +8,7 @@ import NodeOverview from "./NodeOverview";
 import StatementOverview from "./StatementOverview";
 import { kinds } from "../services/nodeService";
 import PolicyOverview from "./PolicyOverview";
+import UserOverviewPanel from "./UserOverviewPanel";
 
 interface Props {
   node: Node;
@@ -30,12 +31,16 @@ const NodeOverviewPanel = ({ node }: Props) => {
 
   return (
     <>
-      <Tabs width="100%">
+      <Tabs width="100%" isFitted variant="soft-rounded" size="sm">
         <TabList>
           {nodeKinds.map((kind) => (
-            <Tab key={kind}>{tabTitleMap.get(kind)}</Tab>
+            <Tab fontSize="xs" key={kind}>
+              {tabTitleMap.get(kind)}
+            </Tab>
           ))}
-          <Tab key="nodeOverview">Node Overview</Tab>
+          <Tab fontSize="xs" key="nodeOverview">
+            Node Overview
+          </Tab>
         </TabList>
         <TabPanels>
           {nodeKinds.map((kind) => (
@@ -45,6 +50,9 @@ const NodeOverviewPanel = ({ node }: Props) => {
               ) : null}
               {kind === kinds.AWSRole ? (
                 <RoleOverviewPanel node={node}></RoleOverviewPanel>
+              ) : null}
+              {kind === kinds.AWSUser ? (
+                <UserOverviewPanel node={node}></UserOverviewPanel>
               ) : null}
               {kind === kinds.UniqueArn ? (
                 <ResourceOverview node={node} />

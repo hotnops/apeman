@@ -9,25 +9,35 @@ interface Props {
 const NodeOverview = ({ node }: Props) => {
   return (
     <>
-      <Table>
+      <Table size="sm">
         <Tbody>
           {Object.keys(node.properties.map).map((key) => (
             <Tr>
-              <Td>{key}</Td>
-              <Td>{node.properties.map[key]}</Td>
+              <Td>
+                <b>{key}</b>
+              </Td>
+              <Td textAlign="right">{node.properties.map[key]}</Td>
             </Tr>
           ))}
           <Tr>
-            <Td>Kinds</Td>
             <Td>
+              <b>kinds</b>
+            </Td>
+            <Td textAlign="right">
               {node.kinds.map((kind) => (
                 <p>{kind}</p>
               ))}
             </Td>
           </Tr>
+          <Tr>
+            <Td>
+              <b>node id</b>
+            </Td>
+            <Td textAlign="right">{node.id}</Td>
+          </Tr>
         </Tbody>
       </Table>
-      <Text fontSize="xl">Tags</Text>
+      <Text fontSize="md">Tags</Text>
       <TagPanel></TagPanel>
     </>
   );
