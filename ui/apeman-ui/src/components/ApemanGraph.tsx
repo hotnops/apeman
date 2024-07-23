@@ -68,7 +68,12 @@ const theme = {
   },
 };
 
-const ApemanGraph = () => {
+interface Props {
+  graphNodes: { [key: string]: Node };
+  setGraphNodes: (nodes: { [key: string]: Node }) => void;
+}
+
+const ApemanGraph = ({ setGraphNodes }: Props) => {
   const graphRef = useRef<GraphCanvasRef | null>(null);
   const { nodes, edges, activeElement, setActiveElement } = useApemanGraph();
 
@@ -109,6 +114,12 @@ const ApemanGraph = () => {
       onNodeClick={(n: InternalGraphNode) => {
         nodeService.getNodeByID(n.id).request.then((res) => {
           setActiveElement(res.data);
+          setGraphNodes((graphNodes) => {
+            const newNodes = { ...graphNodes };
+            newNodes[res.data.id] = res.data;
+            console.log("Setting newNodes ", res.data);
+            return newNodes;
+          });
         });
       }}
       onEdgeClick={(e: InternalGraphEdge) => {

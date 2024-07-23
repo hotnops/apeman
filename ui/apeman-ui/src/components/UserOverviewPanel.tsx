@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import { Path, addPathToGraph } from "../services/pathService";
 import nodeService, { Node } from "../services/nodeService";
@@ -15,7 +15,6 @@ interface Props {
 
 const UserOverviewPanel = ({ node }: Props) => {
   const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
-  const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
   const [outboundPaths, setOutboundPaths] = useState<Path[]>([]);
   const { addNode, addEdge } = useApemanGraph();
 

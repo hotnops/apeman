@@ -93,7 +93,7 @@ const Pathfinder = ({ onClose }: Props) => {
   return (
     <div ref={wrapperRef}>
       <Card
-        position="fixed"
+        position="relative"
         top="15px"
         left="10px"
         width="30em"

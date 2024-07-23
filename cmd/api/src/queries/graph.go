@@ -424,6 +424,7 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 		"RETURN a.arn, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
 
 	formatted_query := fmt.Sprintf(query, principalNode.ID)
+	log.Print(formatted_query)
 	actionPathSet := analyze.ActionPathSet{}
 	result, err := RawCypherQuery(ctx, db, formatted_query, nil)
 	for _, item := range result {
@@ -468,6 +469,7 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 				continue
 			}
 			entry.Conditions = conditions
+			PopulateTags(ctx, db, &entry)
 		} else {
 			entry.Conditions = nil
 		}

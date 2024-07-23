@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import ApemanGraph from "./components/ApemanGraph";
-import { GraphCanvas } from "reagraph";
 import NodeExplorer from "./components/NodeExplorer";
 
-import { IoCloseCircle } from "react-icons/io5";
 import NodeBar from "./components/NodeBar";
 import { Node } from "./services/nodeService";
-import { Card, Tab, TabList, Tabs } from "@chakra-ui/react";
+import { Tab, TabList, Tabs } from "@chakra-ui/react";
 import NavBar from "./components/NavBar";
+import { useApemanGraph } from "./hooks/useApemanGraph";
+import Pathfinder from "./components/Pathfinder";
 
 const Container = styled.div`
   display: flex;
@@ -68,6 +68,8 @@ const App: React.FC = () => {
   const [panelWidth, setPanelWidth] = useState(300);
 
   const [graphNodes, setGraphNodes] = useState<{ [key: string]: Node }>({});
+  const [showPathfinder, setShowPathfinder] = useState(false);
+  const { activeElement } = useApemanGraph();
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const startX = e.clientX;
@@ -93,7 +95,7 @@ const App: React.FC = () => {
         <Tabs variant={"soft-rounded"} padding="10px">
           <TabList>
             <Tab>Explorer</Tab>
-            <Tab>Graph</Tab>
+            <Tab>Context Manager</Tab>
           </TabList>
         </Tabs>
       </Header>
@@ -107,7 +109,15 @@ const App: React.FC = () => {
             <NodeBar graphNodes={graphNodes} setGraphNodes={setGraphNodes} />
           )}
           <ApemanGraphContainer>
-            <ApemanGraph />
+            {!activeElement &&
+              (showPathfinder ? (
+                <Pathfinder
+                  onClose={() => setShowPathfinder(false)}
+                ></Pathfinder>
+              ) : (
+                <NavBar closeNavBar={() => setShowPathfinder(true)}></NavBar>
+              ))}
+            <ApemanGraph setGraphNodes={setGraphNodes} />
           </ApemanGraphContainer>
         </MainContent>
       </MainContainer>

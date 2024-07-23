@@ -38,10 +38,10 @@ const NavBar = ({ closeNavBar }: Props) => {
   return (
     <div ref={wrapperRef}>
       <Card
-        position="fixed"
+        position="relative"
         top="15px"
         left="10px"
-        width="30em"
+        width="25em"
         height="35px"
         zIndex={1}
         margin="5px"

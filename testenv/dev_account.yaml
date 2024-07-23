@@ -3,6 +3,40 @@ Description: Dev account
 
 Resources:
   # IAM Roles
+  DevOpsSSMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "DevOpsSSMRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref SSMTaggedAccessPolicy
+      Tags:
+        - Key: "team"
+          Value: "devops"
+
+  HelpdeskSSMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "HelpdeskSSMRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref SSMTaggedAccessPolicy
+      Tags:
+        - Key: "team"
+          Value: "helpdesk"
+
   ABACRoleTest:
     Type: "AWS::IAM::Role"
     DependsOn: "ABACTeamSSMPolicy"
@@ -227,7 +261,22 @@ Resources:
             Condition:
               StringEquals:
                 # Check if the resource tag equals the principal tag
-                "ssm:ResourceTag/team": "${aws:PrincipalTag/team}"
+                "aws:ResourceTag/team": "${aws:PrincipalTag/team}"
+
+  SSMTaggedAccessPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "SSMTaggedAccessPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "ssm:*"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                # Check if the resource tag equals the principal tag
+                "aws:ResourceTag/team": "${aws:PrincipalTag/team}"
 
   # SSM Parameters
   SSMArtifactoryKey:
@@ -245,5 +294,5 @@ Resources:
       Description: "The key to publish to Artifactory"
       Type: "String"
       Tags:
-        Team: "test"
+        Team: "devops"
       Value: "super_secret_api_key"

@@ -28,6 +28,8 @@ const PolicyOverview = ({ node }: Props) => {
         ...newPrincipals,
       ]);
     });
+
+    return () => cancel();
   }, []);
 
   useEffect(() => {

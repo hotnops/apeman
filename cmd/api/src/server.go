@@ -325,11 +325,16 @@ func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
-		prinToActionMap := analyze.ActionPathSetToMap(*resolvedPaths)
-		if err != nil {
-			c.AbortWithError(http.StatusBadRequest, err)
+		if resolvedPaths == nil {
+			log.Print("No paths found")
+			c.IndentedJSON(http.StatusOK, nil)
+		} else {
+			prinToActionMap := analyze.ActionPathSetToMap(*resolvedPaths)
+			if err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+			}
+			c.IndentedJSON(http.StatusOK, prinToActionMap)
 		}
-		c.IndentedJSON(http.StatusOK, prinToActionMap)
 	}
 }
 
@@ -481,7 +486,7 @@ func (s *Server) GetNodeIdentityPath(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
 
-	query := fmt.Sprintf("MATCH p=shortestPath((a) - [:CanAssume*] -> (b)) WHERE ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
+	query := fmt.Sprintf("MATCH p=shortestPath((a) - [:IdentityTransform*] -> (b)) WHERE ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
 	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)

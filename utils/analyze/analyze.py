@@ -14,7 +14,7 @@ def populate_principal_blob(session):
         WHERE b.arn =~ a.regex OR b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
         ",
-        {batchSize: 10, parallel: true}
+        {batchSize: 10, parallel: false}
     )
     """
     session.run(cypher_query)
@@ -70,7 +70,7 @@ def populate_action_blob(session):
         WHERE b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
         ",
-        {batchSize: 10, parallel: true}
+        {batchSize: 10, parallel: false}
     )
     """
     session.run(
