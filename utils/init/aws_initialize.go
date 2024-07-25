@@ -69,8 +69,6 @@ func get_service_metadata(url string) (*PolicyEditorConfig, error) {
 	output := regexp.MustCompile("app.PolicyEditorConfig=")
 	edit := output.ReplaceAllString(string(body), "")
 
-	//fmt.Println(edit)
-
 	err = json.Unmarshal([]byte(edit), &config)
 	error_check(err)
 
@@ -153,22 +151,22 @@ func get_service_dict(link string) {
 			table_length := td.Find("td, th").Length()
 			td.Find("td").Each(func(col int, td *goquery.Selection) {
 
-				if col == 0 {
+				if col == 0 && td.Text() != ""{
 					if table_length == 3 {
 						fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
 					} else {
 						fmt.Printf("Actions:  %s\n", strings.TrimSpace(td.Text()))
 					}
 
-				} else if col == 1 {
+				} else if col == 1 && td.Text() != "" {
 					if table_length == 3 {
 						fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
 					} else {
-						fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+						fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
 					}
 
-				} else if col == 2 {
-					fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
+				} else if col == 2 && td.Text() != ""{
+					fmt.Printf("Access Level:  %s\n", strings.TrimSpace(td.Text()))
 
 				} else if col == 3 {
 					fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
@@ -211,22 +209,42 @@ func response_error_check(err error) {
 }
 
 func main() {
-	//service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
-	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
-	service_json_url := base_url + "toc-contents.json"
+	service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
+	//base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
+	//service_json_url := base_url + "toc-contents.json"
 
-	//services_metadata, err := get_service_metadata(service_url)
-	//error_check(err)
-	/*
-		for _, data := range services_metadata.ServiceMap {
-			fmt.Println(data.Actions)
-		}
-	*/
+	services_metadata, err := get_service_metadata(service_url)
+	error_check(err)
 
-	for _, links := range get_services_json_href(service_json_url) {
 
-		get_service_dict(base_url + links)
+
+	//awsglobalconditionkeys.csv
+	for _, conditionKeys := range services_metadata.ConditionKeys{
+		fmt.Println(conditionKeys)
 	}
 
-	get_service_dict("https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsapp2container.html")
+	//awsoperators.csv
+	for _, operators := range services_metadata.ConditionOperators{
+		fmt.Println(operators)
+	}
+
+	//awsmultivaluedprefix.csv follow up bc theres alot more here
+	for _, details := range services_metadata.ServiceMap {
+		fmt.Println( details.StringPrefix)
+	}
+
+	/*
+		for _, data := range services_metadata.ServiceMap {
+			for _,actions := range data.Actions{
+				fmt.Println("\t",actions)
+			}
+
+		}
+	
+		
+	for _, links := range get_services_json_href(service_json_url) {
+		get_service_dict(base_url + links)
+	}
+		*/
+		
 }
