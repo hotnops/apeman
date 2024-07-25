@@ -42,7 +42,7 @@ const NodeOverview = ({ node }: Props) => {
       <Text fontSize="lg" as="b">
         Tags
       </Text>
-      <TagPanel></TagPanel>
+      <TagPanel node={node}></TagPanel>
     </>
   );
 };

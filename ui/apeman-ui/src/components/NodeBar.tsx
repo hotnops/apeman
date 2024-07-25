@@ -1,9 +1,5 @@
-import React, { useEffect, useState } from "react";
-
 import {
   Box,
-  Button,
-  Card,
   HStack,
   IconButton,
   Tab,
@@ -13,25 +9,16 @@ import {
   Tabs,
   Text,
 } from "@chakra-ui/react";
-import { CloseIcon, SmallCloseIcon } from "@chakra-ui/icons";
-import { useReactTreeApi } from "@naisutech/react-tree";
-import nodeService, {
-  Node,
-  getIconURL,
-  getNodeLabel,
-} from "../services/nodeService";
-import NodeOverview from "./NodeOverview";
+import { SmallCloseIcon } from "@chakra-ui/icons";
+import { Node, getIconURL, getNodeLabel } from "../services/nodeService";
 import NodeOverviewPanel from "./NodeOverviewPanel";
-import { set } from "lodash";
 
 interface Props {
   graphNodes: { [key: string]: Node };
-  setGraphNodes: (nodes: { [key: string]: Node }) => void;
+  setGraphNodes: React.Dispatch<React.SetStateAction<{ [key: string]: Node }>>;
 }
 
 const NodeBar = ({ graphNodes, setGraphNodes }: Props) => {
-  const treeApi = useReactTreeApi();
-
   const closeTab = (nodeId: string) => {
     setGraphNodes((graphNodes) => {
       const newNodes = { ...graphNodes };

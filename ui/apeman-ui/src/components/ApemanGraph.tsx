@@ -6,7 +6,7 @@ import {
   InternalGraphEdge,
   InternalGraphNode,
 } from "reagraph";
-import nodeService from "../services/nodeService";
+import nodeService, { Node } from "../services/nodeService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import { getRelationshipByID } from "../services/relationshipServices";
 
@@ -69,8 +69,7 @@ const theme = {
 };
 
 interface Props {
-  graphNodes: { [key: string]: Node };
-  setGraphNodes: (nodes: { [key: string]: Node }) => void;
+  setGraphNodes: React.Dispatch<React.SetStateAction<{ [key: string]: Node }>>;
 }
 
 const ApemanGraph = ({ setGraphNodes }: Props) => {
@@ -114,8 +113,8 @@ const ApemanGraph = ({ setGraphNodes }: Props) => {
       onNodeClick={(n: InternalGraphNode) => {
         nodeService.getNodeByID(n.id).request.then((res) => {
           setActiveElement(res.data);
-          setGraphNodes((graphNodes) => {
-            const newNodes = { ...graphNodes };
+          setGraphNodes((prevGraphNodes) => {
+            const newNodes = { ...prevGraphNodes };
             newNodes[res.data.id] = res.data;
             console.log("Setting newNodes ", res.data);
             return newNodes;

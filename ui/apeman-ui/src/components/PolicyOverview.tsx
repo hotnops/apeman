@@ -1,4 +1,4 @@
-import { Accordion, Code } from "@chakra-ui/react";
+import { Accordion } from "@chakra-ui/react";
 import PolicyService from "../services/policyService";
 import { useEffect, useState } from "react";
 import { Node } from "../services/nodeService";
@@ -23,7 +23,7 @@ const PolicyOverview = ({ node }: Props) => {
       const newPrincipals = res.data.map((prinNode: Node) => prinNode);
 
       // Update state once with the new principals
-      setAttachedPrincipals((attachedPrincipals) => [
+      setAttachedPrincipals((attachedPrincipals: Node[]) => [
         ...attachedPrincipals,
         ...newPrincipals,
       ]);
@@ -54,7 +54,7 @@ const PolicyOverview = ({ node }: Props) => {
         name="Attached Principals"
       ></AccordionList>
       <SyntaxHighlighter language="json" style={coy}>
-        {policyObject && JSON.stringify(policyObject, null, 4)}
+        {policyObject ? JSON.stringify(policyObject, null, 4) : ""}
       </SyntaxHighlighter>
     </Accordion>
   );

@@ -11,17 +11,15 @@ import { useEffect, useState } from "react";
 import nodeService, { Node } from "../services/nodeService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 
-const TagPanel = () => {
+interface Props {
+  node: Node;
+}
+
+const TagPanel = ({ node }: Props) => {
   const [tagNodes, setTagNodes] = useState<Node[]>([]);
 
-  const { activeElement: activeNode } = useApemanGraph();
   useEffect(() => {
-    if (activeNode == null) {
-      return;
-    }
-    const { request, cancel } = nodeService.getNodeTags(
-      (activeNode as Node).id.toString()
-    );
+    const { request, cancel } = nodeService.getNodeTags(node.id.toString());
     request.then((res) => {
       const nodes: Node[] = res.data;
       nodes.map((node) => {
