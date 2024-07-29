@@ -29,12 +29,13 @@ const NodeSuggestions = ({ nodes, onItemSelect }: Props) => {
           _hover={{ bg: theme.colors.gray[50] }}
           cursor="pointer"
           onClick={() => onItemSelect(node)}
+          key={node.id}
         >
           <NodeListItem node={node} />
         </ListItem>
       ))}
       {truncated && (
-        <ListItem width="100%">
+        <ListItem width="100%" key={"truncated"}>
           <Text textAlign="center" fontSize="large">
             ...
           </Text>

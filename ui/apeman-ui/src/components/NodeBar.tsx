@@ -23,8 +23,6 @@ const NodeBar = ({ graphNodes, setGraphNodes }: Props) => {
     setGraphNodes((graphNodes) => {
       const newNodes = { ...graphNodes };
       delete newNodes[nodeId];
-      console.log("Setting new nodes");
-      console.log(newNodes);
       return newNodes;
     });
   };
@@ -38,20 +36,28 @@ const NodeBar = ({ graphNodes, setGraphNodes }: Props) => {
       <Tabs size="sm" variant="enclosed">
         <TabList overflowY="auto">
           {Object.keys(graphNodes).map((nodeId) => (
-            <Tab key={nodeId}>
-              <HStack>
-                <Box boxSize="10px">
-                  <img src={getIconURL(graphNodes[nodeId].kinds)} />
-                </Box>
-                <Text>{getNodeLabel(graphNodes[nodeId])}</Text>
-                <IconButton
-                  aria-label="Close tab"
-                  icon={<SmallCloseIcon />}
-                  size={"xs"}
-                  onClick={() => closeTab(nodeId)}
-                />
-              </HStack>
-            </Tab>
+            <Box key={nodeId} position="relative">
+              <Tab>
+                <HStack>
+                  <Box boxSize="10px">
+                    <img
+                      src={getIconURL(graphNodes[nodeId].kinds)}
+                      alt="icon"
+                    />
+                  </Box>
+                  <Text>{getNodeLabel(graphNodes[nodeId])}</Text>
+                </HStack>
+              </Tab>
+              <IconButton
+                aria-label="Close tab"
+                icon={<SmallCloseIcon />}
+                size="xs"
+                position="absolute"
+                top="2px"
+                right="2px"
+                onClick={() => closeTab(nodeId)}
+              />
+            </Box>
           ))}
         </TabList>
         <TabPanels>

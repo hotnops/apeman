@@ -145,8 +145,6 @@ export function getNodeLabel(node: Node): string {
 
 function getNodeFill(node: Node) {
   if (node.kinds.includes(kinds.AWSStatement)) {
-    console.log("Statement node");
-    console.log(node);
     if (node.properties.map.effect == "Allow") {
       return "#76d654";
     } else {

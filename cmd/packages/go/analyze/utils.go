@@ -100,7 +100,10 @@ func ResolveConditions(entry ActionPathEntry) (bool, error) {
 		// set fails
 		condition.ConditionKeys, err = ResolveConditionVariables(entry, condition)
 		if err != nil {
-			return false, err
+			// An error means that the variable doesn't exist or
+			// can't be resolved. Simply return false, as it implies
+			// a failed condition
+			return false, nil
 		}
 		if !awsconditions.SolveCondition(&condition) {
 			return false, nil

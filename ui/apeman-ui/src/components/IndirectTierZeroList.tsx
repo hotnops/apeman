@@ -19,10 +19,7 @@ const IndirectTierZeroList = ({ account_id = "" }: Props) => {
 
   function graphPath(n: Node) {
     // Get Path for node
-    console.log(`Node id: ${n.id}`);
     const path = paths.filter((path) => path.Nodes[0].id == n.id)[0];
-    console.log("PATH");
-    console.log(path);
     addPathToGraph(path, addNode, addEdge);
   }
 

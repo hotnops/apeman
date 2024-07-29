@@ -71,7 +71,7 @@ const InlinePolicy = ({ principalNode }: Props) => {
     };
 
     fetchInlinePolicies();
-  }, []);
+  }, [principalNode]);
 
   return (
     <Accordion allowMultiple={true} width="100%">

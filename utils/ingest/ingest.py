@@ -563,7 +563,7 @@ def ingest_csv(session, filename, datatype, fields):
         query += f"a.{field} = {field}, "
     query += "a.layer = 1 "
     try:
-        session.run(query)
+        return session.run(query)
     except Exception as e:
         print(e)
         import pdb; pdb.set_trace()
@@ -626,7 +626,7 @@ def load_csvs_into_database():
         # is one that gets its own ARN. To fit with the naming scheme,
         # we are keeping AWSManagedPolicy
         ingest_csv(session, "managedpolicies.csv", "AWSManagedPolicy:UniqueArn",
-                   ["policyname", "policyid", "arn", "path",
+                   ["arn", "policyname", "policyid", "path",
                     "defaultversionid", "attachmentcount",
                     "permissionsboundaryusagecount",
                     "isattachable", "createdate", "updatedate"])
@@ -902,7 +902,7 @@ def write_nodes_to_csv(output_dir: str):
     managed_policies_filename = os.path.join(output_dir,
                                              "managedpolicies.csv")
 
-    managed_policies_field_names = ["policyname", "policyid", "arn", "path",
+    managed_policies_field_names = ["arn", "policyname", "policyid", "path",
                                     "defaultversionid", "attachmentcount",
                                     "permissionsboundaryusagecount",
                                     "isattachable", "createdate",

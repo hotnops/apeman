@@ -13,24 +13,24 @@ const NodeOverview = ({ node }: Props) => {
         <Table size="sm" variant="simple">
           <Tbody>
             {Object.keys(node.properties.map).map((key) => (
-              <Tr>
+              <Tr key={key}>
                 <Td>
                   <b>{key}</b>
                 </Td>
                 <Td textAlign="right">{node.properties.map[key]}</Td>
               </Tr>
             ))}
-            <Tr>
+            <Tr key="kinds">
               <Td>
                 <b>kinds</b>
               </Td>
               <Td textAlign="right">
-                {node.kinds.map((kind) => (
-                  <p>{kind}</p>
+                {node.kinds.map((kind, index) => (
+                  <p key={index}>{kind}</p>
                 ))}
               </Td>
             </Tr>
-            <Tr>
+            <Tr key="node-id">
               <Td>
                 <b>node id</b>
               </Td>

@@ -19,7 +19,6 @@ const PolicyOverview = ({ node }: Props) => {
       node.properties.map.policyid
     );
     request.then((res) => {
-      console.log(typeof res.data);
       const newPrincipals = res.data.map((prinNode: Node) => prinNode);
 
       // Update state once with the new principals
@@ -38,7 +37,6 @@ const PolicyOverview = ({ node }: Props) => {
       node.properties.map.policyid
     );
     request.then((res) => {
-      console.log(typeof res.data);
       setPolicyObject(res.data);
     });
 

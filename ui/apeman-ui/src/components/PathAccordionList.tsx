@@ -58,9 +58,9 @@ const AccordionList = ({
         <Table overflowX="scroll" size="sm">
           <Tbody>
             {paths.map((path) => (
-              <Tr>
+              <Tr key={paths.indexOf(path)}>
                 <Td textOverflow="ellipsis" width="80%">
-                  <Text fontSize="xs">{pathLabelFunction(path)}</Text>
+                  <Text fontSize="xs">{pathLabelFunction(path) + "ASDF"}</Text>
                 </Td>
 
                 {pathFunction && (

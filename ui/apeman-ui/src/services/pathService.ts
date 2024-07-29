@@ -51,8 +51,6 @@ export function addPathToGraph(
   });
 
   path.Edges.map((edge) => {
-    console.log("EDGE");
-    console.log(edge);
     addEdge(edge);
   });
 }

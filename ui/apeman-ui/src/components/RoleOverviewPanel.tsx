@@ -16,14 +16,14 @@ interface Props {
   node: Node;
 }
 
-const RoleOverviewPanel = ({ node }: Props) => {
-  const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
-  const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
-  const [outboundPaths, setOutboundPaths] = useState<Path[]>([]);
+const RoleOverviewPanel = ({ node }) => {
+  const [attachedPolicies, setAttachedPolicies] = useState([]);
+  const [inboundPaths, setInboundPaths] = useState([]);
+  const [outboundPaths, setOutboundPaths] = useState([]);
   const { addNode, addEdge } = useApemanGraph();
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent setting state if the component is unmounted
+    let isMounted = true;
     setAttachedPolicies([]);
 
     const fetchManagedPolicies = async () => {
@@ -33,7 +33,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
         );
         const res = await request;
 
-        const policyRequests = res.data.nodes.map((node: Node) => {
+        const policyRequests = res.data.nodes.map((node) => {
           const { request } = NodeService.getNodeByID(node.id.toString());
           return request;
         });
@@ -41,7 +41,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
         const responses = await Promise.all(policyRequests);
 
         if (isMounted) {
-          const newPolicies = responses.map((res) => res.data as Node);
+          const newPolicies = responses.map((res) => res.data);
           setAttachedPolicies(newPolicies);
         }
       } catch (error) {
@@ -52,31 +52,44 @@ const RoleOverviewPanel = ({ node }: Props) => {
     fetchManagedPolicies();
 
     return () => {
-      isMounted = false; // Prevent state updates if the component is unmounted
-      // Add any necessary cleanup here
+      isMounted = false;
     };
-  }, []); // Add node.properties.map.roleid as a dependency if it can change
+  }, [node.properties.map.roleid]);
 
   useEffect(() => {
     const { request, cancel } = GetInboundRoles(node.properties.map.roleid);
-    request.then((res) => {
-      setInboundPaths(res.data.map((path: Path) => path));
-    });
+    request
+      .then((res) => {
+        setInboundPaths(res.data.map((path) => path));
+      })
+      .catch((error) => {
+        if (error.code !== "ERR_CANCELED") {
+          console.error("Error fetching inbound roles:", error);
+        }
+      });
+
     return cancel;
-  }, []);
+  }, [node.properties.map.roleid]);
 
   useEffect(() => {
     const { request, cancel } = GetOutboundRoles(node.properties.map.roleid);
-    request.then((res) => {
-      setOutboundPaths(res.data.map((path: Path) => path));
-    });
+    request
+      .then((res) => {
+        setOutboundPaths(res.data.map((path) => path));
+      })
+      .catch((error) => {
+        if (error.code !== "ERR_CANCELED") {
+          console.error("Error fetching outbound roles:", error);
+        }
+      });
+
     return cancel;
-  }, []);
+  }, [node.properties.map.roleid]);
 
   return (
     <>
       <Card>
-        <Table size={"xs"} variant="unstyled">
+        <Table size="xs" variant="unstyled">
           <Tbody>
             <Tr key="rolename">
               <Td>
@@ -122,18 +135,18 @@ const RoleOverviewPanel = ({ node }: Props) => {
           <PathAccordionList
             paths={inboundPaths}
             name="Inbound Principals"
-            pathFunction={(n: Path) => {
+            pathFunction={(n) => {
               addPathToGraph(n, addNode, addEdge);
             }}
-            pathLabelFunction={(n: Path) => n.Nodes[0].properties.map.arn}
+            pathLabelFunction={(n) => n.Nodes[0].properties.map.arn}
           ></PathAccordionList>
           <PathAccordionList
             paths={outboundPaths}
             name="Outbound Principals"
-            pathFunction={(n: Path) => {
+            pathFunction={(n) => {
               addPathToGraph(n, addNode, addEdge);
             }}
-            pathLabelFunction={(n: Path) =>
+            pathLabelFunction={(n) =>
               n.Nodes?.[n.Nodes.length - 1]?.properties?.map?.arn || "Unknown"
             }
           ></PathAccordionList>
@@ -148,7 +161,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
       </Card>
       <Card>
         <PermissionList
-          endpoint={"roles/" + node.properties.map.roleid + "/rsop"}
+          endpoint={`roles/${node.properties.map.roleid}/rsop`}
           resourceId={() => node.id}
         >
           Resultant Set Of Policy

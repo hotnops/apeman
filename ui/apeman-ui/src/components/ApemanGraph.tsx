@@ -116,7 +116,6 @@ const ApemanGraph = ({ setGraphNodes }: Props) => {
           setGraphNodes((prevGraphNodes) => {
             const newNodes = { ...prevGraphNodes };
             newNodes[res.data.id] = res.data;
-            console.log("Setting newNodes ", res.data);
             return newNodes;
           });
         });

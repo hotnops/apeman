@@ -41,14 +41,12 @@ export const useGetNodes = (
             label: node.properties.map.account_id,
           });
         });
-        console.log("Setting nodes");
         setNodes(nodes);
       })
       .catch(() => {
         setNodes([]);
       })
       .finally(() => {
-        console.log("Finished loading");
         setLoading(false);
       });
   }, []);
@@ -62,7 +60,6 @@ const usePermissions = (endpoint: string, refreshCount: number) => {
   const controller = new AbortController();
 
   useEffect(() => {
-    console.log("UseEffect");
     setLoading(true);
 
     apiClient

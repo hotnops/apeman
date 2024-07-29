@@ -23,7 +23,6 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("text change");
     setSearchQuery(event.target.value);
   };
 
@@ -34,6 +33,7 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
     const filteredMap: PrincipalToActionMap = {};
 
     if (query === "") {
+      console.log(map);
       return map;
     }
 
@@ -42,7 +42,7 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
         filteredMap[key] = value;
       }
     }
-
+    console.log(filteredMap);
     return filteredMap;
   }
 
@@ -69,8 +69,6 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
       .then((res) => {
         //setPermissions(res.data);
         // Create a string to action list map
-        console.log("RSOP");
-        console.log(res.data);
         setPaths(res.data);
       })
       .catch((err) => {

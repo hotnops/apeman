@@ -111,7 +111,12 @@ const NodeExplorer: FC<Props> = ({ setGraphNodes }) => {
           nodes.forEach((node) => getChildNodes(node));
         }}
         onToggleSelectedNodes={(nodes: TreeNodeId[]) => {
-          nodes.forEach((node) => fetchNode(node as string));
+          nodes.forEach((node) => {
+            const parsed = Number(node as string);
+            if (!isNaN(parsed)) {
+              fetchNode(node as string);
+            }
+          });
         }}
       />
     </Box>

@@ -15,7 +15,6 @@ interface Props {
 }
 
 const NodeOverviewPanel = ({ node }: Props) => {
-  console.log("Rendering NodeOverviewPanel");
   const nodeKinds = node.kinds;
 
   let tabTitleMap = new Map<string, string>([

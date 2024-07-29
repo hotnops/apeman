@@ -4,8 +4,8 @@ import {
   AccordionItem,
   AccordionPanel,
   Box,
-  Button,
   HStack,
+  IconButton,
   List,
   ListItem,
   Text,
@@ -60,7 +60,7 @@ const PermissionItem = ({ name, actions, resourceId }: Props) => {
   };
 
   return (
-    <AccordionItem>
+    <AccordionItem key={name}>
       <h2>
         <AccordionButton>
           <Box as="span" flex="1" textAlign="left">
@@ -74,18 +74,18 @@ const PermissionItem = ({ name, actions, resourceId }: Props) => {
       <AccordionPanel>
         <List spacing={3}>
           {actions.map((action) => (
-            <ListItem>
+            <ListItem key={name + action}>
               <HStack width="100%">
                 <Text width="90%" fontSize="xs">
                   {action}
                 </Text>
-                <Button
+                <IconButton
+                  aria-label="Graph permissions"
                   onClick={() =>
                     graphPermissionPathWithAction(name, resourceId, action)
                   }
-                >
-                  <PiGraph />
-                </Button>
+                  icon={<PiGraph />}
+                />
               </HStack>
             </ListItem>
           ))}

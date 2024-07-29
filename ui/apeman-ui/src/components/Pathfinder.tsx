@@ -54,7 +54,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -67,7 +66,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -80,7 +78,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -101,15 +98,7 @@ const Pathfinder = ({ onClose }: Props) => {
         margin="5px"
         backgroundColor={theme.colors.white}
       >
-        <HStack justifyContent="right">
-          <IconButton
-            aria-label="close nav"
-            icon={<IoClose></IoClose>}
-            isRound={true}
-            onClick={onClose}
-            size="xs"
-          />
-        </HStack>
+        <HStack justifyContent="right">{/* / */}</HStack>
         <Tabs onChange={(index) => setTabIndex(index)}>
           <TabList>
             <Tab>
