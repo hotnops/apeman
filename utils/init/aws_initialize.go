@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -189,8 +191,22 @@ func aws_initialize() {
 	// save for later
 }
 
-func write_data_to_csv() {
+func write_data_to_csv(filename string, data []string) {
 	//output this all to a csv
+
+	file,err := os.Create(filename)
+
+  if err != nil {
+		panic(err)
+	}
+
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	writer.Write(data)
+
+	
 
 }
 
@@ -216,22 +232,11 @@ func main() {
 	services_metadata, err := get_service_metadata(service_url)
 	error_check(err)
 
-
-
 	//awsglobalconditionkeys.csv
-	for _, conditionKeys := range services_metadata.ConditionKeys{
-		fmt.Println(conditionKeys)
-	}
-
+	write_data_to_csv("awsglobalconditionkeys.csv",services_metadata.ConditionKeys)
 	//awsoperators.csv
-	for _, operators := range services_metadata.ConditionOperators{
-		fmt.Println(operators)
-	}
+	write_data_to_csv("awsoperators.csv",services_metadata.ConditionOperators)
 
-	//awsmultivaluedprefix.csv follow up bc theres alot more here
-	for _, details := range services_metadata.ServiceMap {
-		fmt.Println( details.StringPrefix)
-	}
 
 	/*
 		for _, data := range services_metadata.ServiceMap {
