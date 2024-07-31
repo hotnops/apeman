@@ -11,6 +11,7 @@ export interface ActionPathEntry {
   principal_id: number;
   principal_arn: string;
   resource_arn: string;
+  resource_id: number;
   action: string;
   path: Path;
   effect: string;

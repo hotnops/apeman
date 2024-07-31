@@ -9,6 +9,7 @@ import StatementOverview from "./StatementOverview";
 import { kinds } from "../services/nodeService";
 import PolicyOverview from "./PolicyOverview";
 import UserOverviewPanel from "./UserOverviewPanel";
+import GroupOverviewPanel from "./GroupOverviewPanel";
 
 interface Props {
   node: Node;
@@ -58,6 +59,9 @@ const NodeOverviewPanel = ({ node }: Props) => {
               ) : null}
               {kind === kinds.AWSUser ? (
                 <UserOverviewPanel node={node}></UserOverviewPanel>
+              ) : null}
+              {kind === kinds.AWSGroup ? (
+                <GroupOverviewPanel node={node}></GroupOverviewPanel>
               ) : null}
               {kind === kinds.UniqueArn ? (
                 <ResourceOverview node={node} />

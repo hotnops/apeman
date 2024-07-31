@@ -74,25 +74,27 @@ const InlinePolicy = ({ principalNode }: Props) => {
   }, [principalNode]);
 
   return (
-    <Accordion allowMultiple={true} width="100%">
-      <AccordionItem>
-        <AccordionButton>
-          <Box as="span" flex="1" textAlign="left">
-            <Text as="b" fontSize="sm">
-              Inline Policies
-            </Text>
-          </Box>
-          <AccordionIcon />
-        </AccordionButton>
-        <AccordionPanel>
-          {inlinePolicies.map((policy) => (
-            <SyntaxHighlighter language="json" style={coy}>
-              {policy && JSON.stringify(policy, null, 4)}
-            </SyntaxHighlighter>
-          ))}
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
+    inlinePolicies.length > 0 && (
+      <Accordion allowMultiple={true} width="100%">
+        <AccordionItem>
+          <AccordionButton>
+            <Box as="span" flex="1" textAlign="left">
+              <Text as="b" fontSize="sm">
+                Inline Policies
+              </Text>
+            </Box>
+            <AccordionIcon />
+          </AccordionButton>
+          <AccordionPanel>
+            {inlinePolicies.map((policy) => (
+              <SyntaxHighlighter language="json" style={coy}>
+                {policy && JSON.stringify(policy, null, 4)}
+              </SyntaxHighlighter>
+            ))}
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
+    )
   );
 };
 

@@ -10,6 +10,7 @@ import (
 )
 
 type PrincipalToActionMap map[string][]string
+type ActionToPathMap map[string][]ActionPathEntry
 
 func GetNodeFromPathByKind(path graph.Path, kind graph.Kind) *graph.Node {
 	for _, node := range path.Nodes {

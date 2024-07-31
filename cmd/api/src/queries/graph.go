@@ -211,7 +211,7 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		"WITH a, s, b " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
 		"OPTIONAL MATCH (s) - [:Principal] - > (pb:AWSPrincipalBlob) - [:ExpandsTo*1..2] -> (b) " +
-		"RETURN b, a.arn, s, COALESCE(c IS NOT NULL, false), COALESCE(pb IS NOT NULL, false)"
+		"RETURN b, a, s, COALESCE(c IS NOT NULL, false), COALESCE(pb IS NOT NULL, false)"
 
 	params := map[string]any{
 		"roleid": roleId,
@@ -227,7 +227,7 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 	for _, result := range results {
 		newActionPathEntry := analyze.ActionPathEntry{}
 		var sourceNode graph.Node
-		var destArn string
+		var destNode graph.Node
 		var statement graph.Node
 		var conditionExists bool
 		var isPrinExpanded bool
@@ -236,7 +236,7 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		if err != nil {
 			continue
 		}
-		err = result.Map(&destArn)
+		err = result.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -267,6 +267,8 @@ func GetAWSRoleInboundRoleAssumptionPaths(ctx context.Context, db graph.Database
 		newActionPathEntry.PrincipalID = sourceNode.ID
 		sourceArn, _ := sourceNode.Properties.Get("arn").String()
 		newActionPathEntry.PrincipalArn = sourceArn
+		newActionPathEntry.ResourceID = destNode.ID
+		destArn, _ := destNode.Properties.Get("arn").String()
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Statement = &statement
@@ -421,23 +423,23 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 		"MATCH p2=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction) " +
 		"WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a.arn, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b, s, act.name, COALESCE(c IS NOT NULL, false)"
 
 	formatted_query := fmt.Sprintf(query, principalNode.ID)
 	log.Print(formatted_query)
 	actionPathSet := analyze.ActionPathSet{}
 	result, err := RawCypherQuery(ctx, db, formatted_query, nil)
 	for _, item := range result {
-		var sourcearn string
-		var destArn string
+		var sourceNode graph.Node
+		var destNode graph.Node
 		var statement graph.Node
 		var action string
 		var conditionExists bool
-		err = item.Map(&sourcearn)
+		err = item.Map(&sourceNode)
 		if err != nil {
 			continue
 		}
-		err = item.Map(&destArn)
+		err = item.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -458,7 +460,10 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 
 		entry := analyze.ActionPathEntry{}
 		entry.PrincipalID = principalNode.ID
-		entry.PrincipalArn = sourcearn
+		sourceArn, _ := sourceNode.Properties.Get("arn").String()
+		entry.PrincipalArn = sourceArn
+		entry.ResourceID = destNode.ID
+		destArn, _ := destNode.Properties.Get("arn").String()
 		entry.ResourceArn = destArn
 		entry.Action = action
 		entry.Effect = effect
@@ -486,6 +491,7 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 
 func GetNodePermissionPath(ctx context.Context, db graph.Database, sourdeNodeID graph.ID, destNodeID graph.ID, actionName string) ([]graph.Path, error) {
 	// First, get all paths to target resource
+	// TODO: This doesn't account for group memberships!!
 	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSInlinePolicy|AWSManagedPolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) " +
 		"WHERE ID(a) = $sourceNodeId AND ID(b) = $destNodeId " +
 		"WITH s, p " +
@@ -1003,7 +1009,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		"WITH a, s, b " +
 		"MATCH p2 = (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b, s, act.name, COALESCE(c IS NOT NULL, false)"
 
 	params := map[string]any{
 		"roleId":     roleId,
@@ -1019,7 +1025,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 	for _, result := range results {
 		newActionPathEntry := analyze.ActionPathEntry{}
 		var sourceNode graph.Node
-		var destArn string
+		var destNode graph.Node
 		var statement graph.Node
 		var action string
 		var conditionExists bool
@@ -1027,7 +1033,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		if err != nil {
 			continue
 		}
-		err = result.Map(&destArn)
+		err = result.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -1058,6 +1064,8 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithArnsAndActions(ctx context.Cont
 		newActionPathEntry.PrincipalID = sourceNode.ID
 		sourceArn, _ := sourceNode.Properties.Get("arn").String()
 		newActionPathEntry.PrincipalArn = sourceArn
+		newActionPathEntry.ResourceID = destNode.ID
+		destArn, _ := destNode.Properties.Get("arn").String()
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
@@ -1081,7 +1089,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 		"WITH a, s, b " +
 		"MATCH p2 = (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a, b.arn, s, act.name, COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b, s, act.name, COALESCE(c IS NOT NULL, false)"
 
 	params := map[string]any{
 		"targetArn":  targetArn,
@@ -1096,7 +1104,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 	for _, result := range results {
 		newActionPathEntry := analyze.ActionPathEntry{}
 		var sourceNode graph.Node
-		var destArn string
+		var destNode graph.Node
 		var statement graph.Node
 		var action string
 		var conditionExists bool
@@ -1104,7 +1112,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 		if err != nil {
 			continue
 		}
-		err = result.Map(&destArn)
+		err = result.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -1135,6 +1143,8 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 		newActionPathEntry.PrincipalID = sourceNode.ID
 		sourceArn, _ := sourceNode.Properties.Get("arn").String()
 		newActionPathEntry.PrincipalArn = sourceArn
+		newActionPathEntry.ResourceID = destNode.ID
+		destArn, _ := destNode.Properties.Get("arn").String()
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
@@ -1159,7 +1169,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Data
 		"OPTIONAL MATCH pa1=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act1:AWSAction) WHERE (act1) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH pa2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act2:AWSAction) WHERE (act2) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a.arn, b.arn, s, COALESCE(act1.name, act2.name), COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b, s, COALESCE(act1.name, act2.name), COALESCE(c IS NOT NULL, false)"
 
 	formatted_query := fmt.Sprintf(query, arn)
 
@@ -1171,16 +1181,16 @@ func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Data
 	actionPathSet := analyze.ActionPathSet{}
 	for _, result := range results {
 		newActionPathEntry := analyze.ActionPathEntry{}
-		var sourceArn string
-		var destArn string
+		var sourceNode graph.Node
+		var destNode graph.Node
 		var statement graph.Node
 		var action string
 		var conditionExists bool
-		err = result.Map(&sourceArn)
+		err = result.Map(&sourceNode)
 		if err != nil {
 			continue
 		}
-		err = result.Map(&destArn)
+		err = result.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -1208,7 +1218,11 @@ func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Data
 			newActionPathEntry.Conditions = conditions
 		}
 
+		newActionPathEntry.PrincipalID = sourceNode.ID
+		sourceArn, _ := sourceNode.Properties.Get("arn").String()
 		newActionPathEntry.PrincipalArn = sourceArn
+		newActionPathEntry.ResourceID = destNode.ID
+		destArn, _ := destNode.Properties.Get("arn").String()
 		newActionPathEntry.ResourceArn = destArn
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
@@ -1233,7 +1247,7 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnFromArn(ctx context.Context, db gra
 		"OPTIONAL MATCH pa1=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act1:AWSAction) WHERE (act1) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH pa2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act2:AWSAction) WHERE (act2) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH (s) <- [:AttachedTo] - (c:AWSCondition) " +
-		"RETURN a.arn, b.arn, s, COALESCE(act1.name, act2.name), COALESCE(c IS NOT NULL, false)"
+		"RETURN a, b, s, COALESCE(act1.name, act2.name), COALESCE(c IS NOT NULL, false)"
 
 	params := map[string]any{
 		"destArn":   arn,
@@ -1247,16 +1261,16 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnFromArn(ctx context.Context, db gra
 	actionPathSet := analyze.ActionPathSet{}
 	for _, result := range results {
 		newActionPathEntry := analyze.ActionPathEntry{}
-		var sourceArn string
-		var destArn string
+		var sourceNode graph.Node
+		var destNode graph.Node
 		var statement graph.Node
 		var action string
 		var conditionExists bool
-		err = result.Map(&sourceArn)
+		err = result.Map(&sourceNode)
 		if err != nil {
 			continue
 		}
-		err = result.Map(&destArn)
+		err = result.Map(&destNode)
 		if err != nil {
 			continue
 		}
@@ -1284,8 +1298,12 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnFromArn(ctx context.Context, db gra
 			newActionPathEntry.Conditions = conditions
 		}
 
+		newActionPathEntry.PrincipalID = sourceNode.ID
+		sourceArn, _ := sourceNode.Properties.Get("arn").String()
 		newActionPathEntry.PrincipalArn = sourceArn
+		destArn, _ := destNode.Properties.Get("arn").String()
 		newActionPathEntry.ResourceArn = destArn
+		newActionPathEntry.ResourceID = destNode.ID
 		newActionPathEntry.Effect = effect
 		newActionPathEntry.Action = action
 		if conditionExists {
@@ -1295,6 +1313,32 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnFromArn(ctx context.Context, db gra
 	}
 
 	return &actionPathSet, nil
+
+}
+
+func GetAWSGroupMembers(ctx context.Context, db graph.Database, groupNode *graph.Node) (graph.PathSet, error) {
+
+	query := "MATCH p=(n:AWSUser)-[:MemberOf]->(g:AWSGroup) WHERE ID(g) = $groudID RETURN p"
+	params := map[string]interface{}{"groudID": groupNode.ID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	pathSet := graph.NewPathSet()
+
+	for _, result := range results {
+		var path graph.Path
+		err = result.Map(&path)
+		if err != nil {
+			continue
+		}
+		pathSet.AddPath(path)
+	}
+
+	return pathSet, nil
 
 }
 

@@ -997,7 +997,7 @@ if __name__ == "__main__":
     for root, dirs, files in os.walk(input_dir):
         for filename in files:
             if filename.endswith('.json'):
-                with open(os.path.join(input_dir, filename), 'r') as f:
+                with open(os.path.join(root, filename), 'r') as f:
                     text = f.read()
                     parse_json(text)
         write_nodes_to_csv(output_dir)

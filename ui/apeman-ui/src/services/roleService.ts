@@ -58,6 +58,20 @@ export function GetRoleRSOP(roleId: string) {
   };
 }
 
+export function GetRoleRSOPActions(roleId: string) {
+  const controller = new AbortController();
+  const request = apiClient.get(`/roles/${roleId}/rsop/actions`, {
+    signal: controller.signal,
+  });
+
+  return {
+    request,
+    cancel: () => {
+      controller.abort();
+    },
+  };
+}
+
 
 class RoleService {
   getRoleManagedPolicyNodes(roleid: string) {

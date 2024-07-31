@@ -2,6 +2,47 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Dev account
 
 Resources:
+  TestIAMGroup:
+    Type: "AWS::IAM::Group"
+    Properties:
+      GroupName: "TestIAMGroup"
+
+  # IAM Users
+  IAMUser1:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: "User1"
+      Groups:
+        - Ref: TestIAMGroup
+
+  IAMUser2:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: "User2"
+      Groups:
+        - Ref: TestIAMGroup
+
+  IAMUser3:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: "User3"
+      Groups:
+        - Ref: TestIAMGroup
+
+  IAMUser4:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: "User4"
+      Groups:
+        - Ref: TestIAMGroup
+
+  IAMUser5:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: "User5"
+      Groups:
+        - Ref: TestIAMGroup
+
   # IAM Roles
   DevOpsSSMRole:
     Type: "AWS::IAM::Role"

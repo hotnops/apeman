@@ -13,6 +13,7 @@ type ActionPathEntry struct {
 	PrincipalArn      string                       `json:"principal_arn"`
 	IsPrincipalDirect bool                         `json:"is_principal_direct"`
 	ResourceArn       string                       `json:"resource_arn"`
+	ResourceID        graph.ID                     `json:"resource_id"`
 	ResourceTags      map[string]string            `json:"resource_tags"`
 	Action            string                       `json:"action"`
 	Path              graph.Path                   `json:"path"`

@@ -116,6 +116,25 @@ func GetPrincipalNodeIDsFromActionSet(actionSet ActionPathSet) []graph.ID {
 
 }
 
+func GetActionMapFromPathSet(actionSet ActionPathSet) (ActionToPathMap, error) {
+	actionMap := make(ActionToPathMap)
+
+	for _, actionPath := range actionSet {
+		action := actionPath.Action
+		// if the action is not in the map, add it
+		paths, ok := actionMap[action]
+		if !ok {
+			paths = make([]ActionPathEntry, 0)
+		}
+
+		paths = append(paths, actionPath)
+		// add the principal to the action's list if it's not already there
+		actionMap[action] = paths
+	}
+
+	return actionMap, nil
+}
+
 func ResourcePathSetToMap(actionSet ActionPathSet) PrincipalToActionMap {
 	actionMap := make(PrincipalToActionMap)
 	for _, actionPath := range actionSet {
