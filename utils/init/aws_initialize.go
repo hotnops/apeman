@@ -24,7 +24,7 @@ type PolicyEditorConfig struct {
 // ServiceDetails represents the details of each service in the service map
 type ServiceDetails struct {
 	StringPrefix string   `json:"StringPrefix"`
-	Actions      []string `json:"Actions"`
+	Actions      map[string]Actions `json:"Actions"`
 	ARNFormat    string   `json:"ARNFormat"`
 	ARNRegex     string   `json:"ARNRegex"`
 	HasResource  bool     `json:"HasResource"`
@@ -41,9 +41,19 @@ type Root struct {
 }
 
 type Actions struct {
-	Action      string
-	Description string
-	Accesslevel string
+	Action        string
+	Description   string
+	Accesslevel   string
+	ResourceType  string
+	ConditionKeys string
+}
+
+type actionInformation struct {
+	Action        string
+	Description   string
+	Accesslevel   string
+	ResourceType  string
+	ConditionKeys string
 }
 
 func printSubsections(content Content) {
@@ -130,13 +140,7 @@ func get_services_json_href(url string) []string {
 
 }
 
-func html_table_to_json(html_response string) {
-	//when pulling aws asctions table, convert the table to json
-	//web request
-
-}
-
-func get_service_dict(link string) {
+func get_service_dict(link string) ([]Actions, error) {
 	//grab href from services json file, and pull the actions from the link
 
 	response, err := http.Get(link)
@@ -147,44 +151,56 @@ func get_service_dict(link string) {
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	error_check(err)
 
+	var details []Actions
+
 	//table #may change with each html response so I should figure out how to add programatically
 	doc.Find("table").Eq(0).Each(func(column int, tr *goquery.Selection) {
+		var detail Actions
 		tr.Find("tr").Each(func(col int, td *goquery.Selection) {
 			table_length := td.Find("td, th").Length()
 			td.Find("td").Each(func(col int, td *goquery.Selection) {
 
-				if col == 0 && td.Text() != ""{
+				if col == 0 && td.Text() != "" {
 					if table_length == 3 {
-						fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+						//fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+						detail.ResourceType = strings.TrimSpace(td.Text())
 					} else {
-						fmt.Printf("Actions:  %s\n", strings.TrimSpace(td.Text()))
+						//fmt.Printf("Actions:  %s\n", strings.TrimSpace(td.Text()))
+						detail.Action = strings.TrimSpace(td.Text())
 					}
 
 				} else if col == 1 && td.Text() != "" {
 					if table_length == 3 {
-						fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+						//fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+						detail.ConditionKeys = strings.TrimSpace(td.Text())
 					} else {
-						fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
+						//fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
+						detail.Description = strings.TrimSpace(td.Text())
 					}
 
-				} else if col == 2 && td.Text() != ""{
-					fmt.Printf("Access Level:  %s\n", strings.TrimSpace(td.Text()))
+				} else if col == 2 && td.Text() != "" {
+					//fmt.Printf("Access Level:  %s\n", strings.TrimSpace(td.Text()))
+					detail.Accesslevel = strings.TrimSpace(td.Text())
 
 				} else if col == 3 {
-					fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+					//fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+					detail.ResourceType = strings.TrimSpace(td.Text())
 
 				} else if col == 4 {
-					fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+					//fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
+					detail.ConditionKeys = strings.TrimSpace(td.Text())
 
 				} else {
-					fmt.Printf("\n")
+
 				}
 			})
 
+			if detail.Action != "" || detail.Description != "" || detail.ResourceType != "" || detail.ConditionKeys != "" || detail.Accesslevel != "" {
+				details = append(details, detail)
+			}
 		})
-
 	})
-
+	return details, nil
 }
 
 func aws_initialize() {
@@ -194,9 +210,9 @@ func aws_initialize() {
 func write_data_to_csv(filename string, data []string) {
 	//output this all to a csv
 
-	file,err := os.Create(filename)
+	file, err := os.Create(filename)
 
-  if err != nil {
+	if err != nil {
 		panic(err)
 	}
 
@@ -204,9 +220,16 @@ func write_data_to_csv(filename string, data []string) {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	writer.Write(data)
+	//Title of column for CSV
+	header := []string{"name"}
+	writer.Write(header)
 
-	
+	for _, value := range data {
+		err := writer.Write([]string{value})
+		if err != nil {
+			panic(err)
+		}
+	}
 
 }
 
@@ -214,14 +237,6 @@ func error_check(err error) {
 	if err != nil {
 		fmt.Println("Error with response:", err)
 	}
-}
-
-func json_error_check(err error) {
-
-}
-
-func response_error_check(err error) {
-
 }
 
 func main() {
@@ -233,23 +248,31 @@ func main() {
 	error_check(err)
 
 	//awsglobalconditionkeys.csv
-	write_data_to_csv("awsglobalconditionkeys.csv",services_metadata.ConditionKeys)
+	write_data_to_csv("awsglobalconditionkeys.csv", services_metadata.ConditionKeys)
 	//awsoperators.csv
-	write_data_to_csv("awsoperators.csv",services_metadata.ConditionOperators)
+	write_data_to_csv("awsoperators.csv", services_metadata.ConditionOperators)
 
+	// for service, data := range services_metadata.ServiceMap {
+	// 	fmt.Println(service)
+	// 	for _, actions := range data.Actions {
+	// 		fmt.Println("\t", actions)
+	// 	}
+	// }
 
-	/*
-		for _, data := range services_metadata.ServiceMap {
-			for _,actions := range data.Actions{
-				fmt.Println("\t",actions)
-			}
+	//for _, links := range get_services_json_href(service_json_url) {
+	//action_metadata, err := get_service_dict(base_url + links)
 
-		}
-	
-		
-	for _, links := range get_services_json_href(service_json_url) {
-		get_service_dict(base_url + links)
-	}
-		*/
-		
+	action_metadata, err := get_service_dict("https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsactivate.html")
+	error_check(err)
+
+	output, err := json.Marshal(action_metadata)
+	error_check(err)
+	// for _, items := range action_metadata {
+	// 	fmt.Println("\tAction:", items.Action)
+	// 	fmt.Println("\tDescription:", items.Description)
+	// 	fmt.Println("\tAccessLevel:", items.Accesslevel)
+	// }
+	fmt.Println(string(output))
+	//}
+
 }
