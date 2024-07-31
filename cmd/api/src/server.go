@@ -311,6 +311,43 @@ func (s *Server) GetGroupPolicies(c *gin.Context) {
 func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 	propertyName := "arn"
 	encodedArn := c.Param(propertyName)
+	action := c.Query("actionName")
+	if action != "" {
+		s.GetAWSInboundPrincipalsWithActionOnArn(c, action)
+	} else {
+		if arnString, err := DecodeArn((encodedArn)); err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		} else {
+			// All the paths that act on this resource
+			identityPaths, err := queries.GetAllUnresolvedIdentityPolicyPathsOnArn(s.ctx, s.db, arnString)
+			if err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+			}
+			// Filter through
+			resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+			if err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+			}
+			if resolvedPaths == nil {
+				log.Print("No paths found")
+				c.IndentedJSON(http.StatusOK, nil)
+			} else {
+				prinToActionMap := analyze.ActionPathSetToMap(*resolvedPaths)
+				if err != nil {
+					c.AbortWithError(http.StatusBadRequest, err)
+				}
+				c.IndentedJSON(http.StatusOK, prinToActionMap)
+			}
+		}
+	}
+
+}
+
+func (s *Server) GetAWSResourceInboundPermissionsPrincipals(c *gin.Context) {
+	propertyName := "arn"
+	encodedArn := c.Param(propertyName)
+	principalMap := map[string]bool{}
+	principals := []string{}
 
 	if arnString, err := DecodeArn((encodedArn)); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
@@ -329,11 +366,93 @@ func (s *Server) GetAWSResourceInboundPermissions(c *gin.Context) {
 			log.Print("No paths found")
 			c.IndentedJSON(http.StatusOK, nil)
 		} else {
-			prinToActionMap := analyze.ActionPathSetToMap(*resolvedPaths)
+			for _, actionPath := range *resolvedPaths {
+				// Add only if not already in list
+				principalMap[actionPath.PrincipalArn] = true
+			}
+
+			for key := range principalMap {
+				principals = append(principals, key)
+			}
+
 			if err != nil {
 				c.AbortWithError(http.StatusBadRequest, err)
 			}
-			c.IndentedJSON(http.StatusOK, prinToActionMap)
+			// Return all the keys of the principals
+			c.IndentedJSON(http.StatusOK, principals)
+		}
+	}
+}
+
+func (s *Server) GetActionsWithPrincipalOnResource(c *gin.Context) {
+	encodedResourceArn := c.Param("arn")
+	encodedPrincipalArn := c.Param("principalArn")
+
+	resourceArn, err := DecodeArn(encodedResourceArn)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	principalArn, err := DecodeArn(encodedPrincipalArn)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	identityPaths, err := queries.GetAllUnresolvedIdentityPolicyPathsOnArnFromArn(s.ctx, s.db, resourceArn, principalArn)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	// Filter through
+	resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	if resolvedPaths == nil {
+		log.Print("No paths found")
+		c.IndentedJSON(http.StatusOK, nil)
+	} else {
+		actions := []string{}
+
+		for _, actionPath := range *resolvedPaths {
+			actions = append(actions, actionPath.Action)
+		}
+		c.IndentedJSON(http.StatusOK, actions)
+	}
+}
+
+func (s *Server) GetAWSInboundPrincipalsWithActionOnArn(c *gin.Context, actionName string) {
+	propertyName := "arn"
+	encodedArn := c.Param(propertyName)
+
+	if arnString, err := DecodeArn((encodedArn)); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	} else {
+		// All the paths that act on this resource
+		identityPaths, err := queries.GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(s.ctx, s.db, arnString, actionName)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+		// Filter through
+		resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+		if resolvedPaths == nil {
+			log.Print("No paths found")
+			c.IndentedJSON(http.StatusOK, nil)
+		} else {
+			principalsIDs := analyze.GetPrincipalNodeIDsFromActionSet(*resolvedPaths)
+			if err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+			}
+			principalNodes := []*graph.Node{}
+			for _, id := range principalsIDs {
+				node, err := analyze.GetAWSNodeByGraphID(s.ctx, s.db, id)
+				if err != nil {
+					c.AbortWithError(http.StatusBadRequest, err)
+				}
+				principalNodes = append(principalNodes, node)
+			}
+			c.IndentedJSON(http.StatusOK, principalNodes)
 		}
 	}
 }
@@ -364,6 +483,21 @@ func (s *Server) GetAWSResource(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	} else {
 		nodes, err := queries.GetAWSNodeByKindID(s.ctx, s.db, propertyName, arnString, aws.UniqueArn)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+		c.IndentedJSON(http.StatusOK, nodes)
+	}
+}
+
+func (s *Server) GetAWSResourceActions(c *gin.Context) {
+	propertyName := "arn"
+	encodedArn := c.Param(propertyName)
+
+	if arnString, err := DecodeArn((encodedArn)); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	} else {
+		nodes, err := queries.GetResouceActions(s.ctx, s.db, arnString)
 		if err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
@@ -449,12 +583,11 @@ func (s *Server) GetAWSNodeTags(c *gin.Context) {
 }
 
 func (s *Server) GetNodePermissionPath(c *gin.Context) {
-	var paths []graph.Path
-	destNodeIdStr := c.Param("nodeid")
-	sourceNodeIdStr := c.Param("destnodeid")
+	sourceNodeIdStr := c.Param("sourcenodeid")
+	destNodeIdStr := c.Param("destnodeid")
 
-	//queryParams := c.Request.URL.Query()
-	//action := queryParams.Get("action")
+	queryParams := c.Request.URL.Query()
+	action := queryParams.Get("action")
 
 	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
 	if err != nil {
@@ -465,8 +598,7 @@ func (s *Server) GetNodePermissionPath(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
 
-	query := fmt.Sprintf("MATCH p=(a) <- [r *1..4] - (s:AWSStatement) - [r2 *1..5] -> (b) WHERE ALL(rel in r WHERE rel.layer = 1 ) AND ID(a) = %d AND ID(b) = %d RETURN p", sourceNodeId, destNodeId)
-	paths, err = queries.CypherQueryPaths(s.ctx, s.db, query)
+	paths, err := queries.GetNodePermissionPath(s.ctx, s.db, graph.ID(sourceNodeId), graph.ID(destNodeId), action)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
@@ -563,6 +695,27 @@ func (s *Server) GetRoleRSOP(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, actionToPrin)
 }
 
+func (s *Server) GetRoleRSOPPrincipals(c *gin.Context) {
+	roleId := c.Param("roleid")
+	node, err := queries.GetAWSNodeByKindID(s.ctx, s.db, "roleid", roleId, aws.AWSRole)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+	paths, err := queries.GetUnresolvedOutputPaths(s.ctx, s.db, node)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, &paths)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+
+	}
+
+	principalMap := analyze.GetResourceArnsFromActionSet(*resolvedPaths)
+	c.IndentedJSON(http.StatusOK, principalMap)
+}
+
 func (s *Server) GetAWSTierZeroNodes(c *gin.Context) {
 	accountId := c.Param("nodeid")
 	query := fmt.Sprintf("MATCH (n) WHERE n.tier_zero = true AND n.account_id = '%s' RETURN n", accountId)
@@ -611,6 +764,38 @@ func (s *Server) GenerateManagedPolicy(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, policyObject)
 }
 
+func (s *Server) GenerateStatement(c *gin.Context) {
+	statementHash := c.Param("statementhash")
+
+	statementNode, err := queries.GetAllAWSNodes(s.ctx, s.db, map[string][]string{"hash": {statementHash}})
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+	if len(statementNode) == 0 {
+		c.IndentedJSON(http.StatusOK, nil)
+	}
+
+	statementObject, err := queries.GenerateStatementObject(s.ctx, s.db, *statementNode[0])
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, statementObject)
+}
+
+func (s *Server) GetStatementPolicies(c *gin.Context) {
+	statementHash := c.Param("statementhash")
+
+	paths, err := queries.GetPoliciesAttachedToStatement(s.ctx, s.db, statementHash)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, paths)
+
+}
+
 func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
 	accountId := c.Param("nodeid")
 	query := fmt.Sprintf("MATCH p=() - [:CanAssume*1..4] -> (t:AWSRole) WHERE t.tier_zero = true AND t.account_id = '%s' RETURN p", accountId)
@@ -635,10 +820,13 @@ func (s *Server) handleRequests() {
 	router.GET("/roles/:roleid/inboundroles", s.GetInboundRoles)
 	router.GET("/roles/:roleid/outboundroles", s.GetRoleOutboundRoles)
 	router.GET("/roles/:roleid/rsop", s.GetRoleRSOP)
+	router.GET("/roles/:roleid/rsop/principals", s.GetRoleRSOPPrincipals)
 	router.GET("/users/:userid", s.GetAWSUser)
 	router.GET("/users/:userid/policies", s.GetUserPolicies)
 	router.GET("/users/:userid/rsop", s.GetUserRSOP)
 	router.GET("/users/:userid/outboundroles", s.GetUserOutboundRoles)
+	router.GET("/statements/:statementhash/generatestatement", s.GenerateStatement)
+	router.GET("/statements/:statementhash/attachedpolicies", s.GetStatementPolicies)
 	router.GET("/managedpolicies/:policyid", s.GetAWSPolicy)
 	router.GET("/managedpolicies/:policyid/generatepolicy", s.GenerateManagedPolicy)
 	router.GET("/managedpolicies/:policyid/principals", s.GetAWSPolicyPrincipals)
@@ -649,18 +837,22 @@ func (s *Server) handleRequests() {
 	router.GET("/accounts/:account_id", s.GetAWSAccount)
 	router.GET("/accounts/:account_id/services", s.GetAWSAccountServices)
 	router.GET("/resources/:arn", s.GetAWSResource)
+	router.GET("/resources/:arn/actions", s.GetAWSResourceActions)
 	router.GET("/resources/:arn/inboundpermissions", s.GetAWSResourceInboundPermissions)
+	router.GET("/resources/:arn/inboundpermissions/principals", s.GetAWSResourceInboundPermissionsPrincipals)
+	router.GET("/resources/:arn/inboundpermissions/principals/:principalArn", s.GetActionsWithPrincipalOnResource)
 	router.GET("/conditionkeys/active", s.GetActiveAWSConditionKeys)
 	router.GET("/node", s.GetAWSNodes)
 	router.GET("/node/:nodeid", s.GetAWSNodeByGraphID)
 	router.GET("/node/:nodeid/shortestpath/:destnodeid", s.GetNodeShortestPath)
-	router.GET("/node/:nodeid/permissionpath/:destnodeid", s.GetNodePermissionPath)
+	//router.GET("/node/:nodeid/permissionpath/:destnodeid", s.GetNodePermissionPath)
 	router.GET("/node/:nodeid/identitypath/:destnodeid", s.GetNodeIdentityPath)
 	router.GET("/node/:nodeid/inboundedges", s.GetAWSNodeInboundEdges)
 	router.GET("/node/:nodeid/outboundedges", s.GetAWSNodeOutboundEdges)
 	router.GET("/node/:nodeid/tags", s.GetAWSNodeTags)
 	router.GET("/node/:nodeid/tierzero", s.GetAWSTierZeroNodes) // This needs to be redone
 	router.GET("/node/:nodeid/tierzeropaths", s.GetAWSTierZeroPaths)
+	router.GET("/permissionpath/:sourcenodeid/:destnodeid", s.GetNodePermissionPath)
 	router.GET("/relationship/:relationshipid", s.GetAWSRelationshipByGraphID)
 	router.GET("/analyze/assumeroles", s.GetAllAssumeRoles)
 	router.GET("/search", s.Search)

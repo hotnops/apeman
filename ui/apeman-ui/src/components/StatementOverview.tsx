@@ -1,28 +1,46 @@
 import { Accordion, Table, Tbody, Td, Tr } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { Node } from "../services/nodeService";
+import { getNodeLabel, Node } from "../services/nodeService";
 
 import AccordionList from "./AccordionList";
-import {
+import statementService, {
   fetchAllStatementData,
   StatementDetails,
 } from "../services/statementService";
+import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/default-highlight";
+import PathAccordionList from "./PathAccordionList";
+import { addPathToGraph, Path } from "../services/pathService";
+import { useApemanGraph } from "../hooks/useApemanGraph";
 
 interface Props {
   node: Node;
 }
 
 const StatementOverview = ({ node }: Props) => {
-  const [statementDetails, setStatementDetails] = useState<StatementDetails>({
-    policies: [],
-    actions: [],
-    resources: [],
-    conditions: [],
-  });
+  const [statementObject, setStatementObject] = useState<string>();
+  const { addNode, addEdge } = useApemanGraph();
+  const [policyPaths, setPolicyPaths] = useState<Path[]>([]);
 
   useEffect(() => {
-    fetchAllStatementData(node, setStatementDetails);
-  }, []);
+    const { request: objectRequest, cancel: objectCancel } =
+      statementService.getStatementObject(node.properties.map["hash"]);
+
+    const { request: policyRequest, cancel: policyCancel } =
+      statementService.getAttachedPolicies(node.properties.map["hash"]);
+
+    Promise.all([objectRequest, policyRequest]).then(
+      ([objectRes, policyRes]) => {
+        setStatementObject(objectRes.data);
+
+        setPolicyPaths(policyRes.data);
+      }
+    );
+
+    return () => {
+      objectCancel();
+      policyCancel();
+    };
+  }, [node]);
 
   // List of policies that use the statement
   // List of actions
@@ -31,33 +49,19 @@ const StatementOverview = ({ node }: Props) => {
 
   return (
     <>
-      <Table>
-        <Tbody>
-          <Tr key="effect">
-            <Td>Effect</Td>
-            <Td>{node.properties.map["effect"]}</Td>
-          </Tr>
-          <Tr></Tr>
-        </Tbody>
-      </Table>
-      <Accordion allowMultiple={true}>
-        <AccordionList
-          nodes={statementDetails.actions}
-          name="actions"
-        ></AccordionList>
+      <Accordion allowMultiple={true} width="100%">
+        <PathAccordionList
+          paths={policyPaths}
+          name="Attached Policies"
+          pathFunction={(n) => {
+            addPathToGraph(n, addNode, addEdge);
+          }}
+          pathLabelFunction={(n) => getNodeLabel(n.Nodes[n.Nodes.length - 1])}
+        ></PathAccordionList>
       </Accordion>
-      <Accordion allowMultiple={true}>
-        <AccordionList
-          nodes={statementDetails.resources}
-          name="resources"
-        ></AccordionList>
-        <Accordion allowMultiple={true}>
-          <AccordionList
-            nodes={statementDetails.conditions}
-            name="conditions"
-          ></AccordionList>
-        </Accordion>
-      </Accordion>
+      <SyntaxHighlighter>
+        {statementObject ? JSON.stringify(statementObject, null, 4) : ""}
+      </SyntaxHighlighter>
     </>
   );
 };

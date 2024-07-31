@@ -55,6 +55,16 @@ export function addPathToGraph(
   });
 }
 
+export function addPathsToGraph(
+  paths: Path[],
+  addNode: (n: Node) => void,
+  addEdge: (e: Relationship) => void
+) {
+  paths.map((path) => {
+    addPathToGraph(path, addNode, addEdge);
+  });
+}
+
 export function GetNodeShortestPath(startNodeId: number, endNodeId: number) {
   const controller = new AbortController();
   const request = apiClient.get(
@@ -92,7 +102,7 @@ export function GetNodeIdentityPath(startNodeId: number, endNodeId: number) {
 export function GetNodePermissionPath(startNodeId: number, endNodeId: number) {
   const controller = new AbortController();
   const request = apiClient.get(
-    `/node/${startNodeId}/permissionpath/${endNodeId}`,
+    `/permissionpath/${startNodeId}/${endNodeId}`,
     {
       signal: controller.signal,
     }
@@ -108,12 +118,12 @@ export function GetNodePermissionPath(startNodeId: number, endNodeId: number) {
 
 export function GetNodePermissionPathWithAction(
   startNodeId: number,
-  endNodeId: number,
+  destNodeId: number,
   action: string
 ) {
   const controller = new AbortController();
   const request = apiClient.get<Path[]>(
-    `/node/${startNodeId}/permissionpath/${endNodeId}?action=${action}`,
+    `/permissionpath/${startNodeId}/${destNodeId}?action=${action}`,
     {
       signal: controller.signal,
     }

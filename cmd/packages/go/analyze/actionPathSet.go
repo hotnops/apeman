@@ -91,6 +91,31 @@ func (p *ActionPathSet) SplitByConditionalEffect() (*ActionPathSet, *ActionPathS
 	return allowMap, denyMap, condtionalAllowMap, conditionalDenyMap
 }
 
+func GetResourceArnsFromActionSet(actionSet ActionPathSet) []string {
+	principals := make([]string, 0)
+	tempDict := make(map[string]bool)
+	// This is a hack to keep the items unique
+	for _, actionPath := range actionSet {
+		tempDict[actionPath.ResourceArn] = true
+	}
+	for key := range tempDict {
+		principals = append(principals, key)
+	}
+	return principals
+}
+
+func GetPrincipalNodeIDsFromActionSet(actionSet ActionPathSet) []graph.ID {
+	// Get all the principal nodes from the action path set
+	graphNodeIDs := make([]graph.ID, 0)
+
+	for _, actionPathEntry := range actionSet {
+		graphNodeIDs = append(graphNodeIDs, actionPathEntry.PrincipalID)
+	}
+
+	return graphNodeIDs
+
+}
+
 func ResourcePathSetToMap(actionSet ActionPathSet) PrincipalToActionMap {
 	actionMap := make(PrincipalToActionMap)
 	for _, actionPath := range actionSet {

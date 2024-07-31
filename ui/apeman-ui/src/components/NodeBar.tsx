@@ -8,6 +8,7 @@ import {
   TabPanels,
   Tabs,
   Text,
+  Tooltip,
 } from "@chakra-ui/react";
 import { SmallCloseIcon } from "@chakra-ui/icons";
 import { Node, getIconURL, getNodeLabel } from "../services/nodeService";
@@ -45,7 +46,16 @@ const NodeBar = ({ graphNodes, setGraphNodes }: Props) => {
                       alt="icon"
                     />
                   </Box>
-                  <Text>{getNodeLabel(graphNodes[nodeId])}</Text>
+                  <Tooltip label={getNodeLabel(graphNodes[nodeId])} hasArrow>
+                    <Text
+                      maxWidth="200px"
+                      whiteSpace="nowrap"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
+                    >
+                      {getNodeLabel(graphNodes[nodeId])}
+                    </Text>
+                  </Tooltip>
                 </HStack>
               </Tab>
               <IconButton

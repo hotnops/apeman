@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import ApemanGraph from "./components/ApemanGraph";
 import NodeExplorer from "./components/NodeExplorer";
-
 import NodeBar from "./components/NodeBar";
 import { Node } from "./services/nodeService";
 import { Tab, TabList, Tabs } from "@chakra-ui/react";
@@ -41,9 +40,10 @@ const Resizer = styled.div`
   background-color: #ccc;
   cursor: ew-resize;
   position: absolute;
-  right: 0;
+  right: -2.5px; /* Ensure resizer is above scrollbar */
   top: 0;
   bottom: 0;
+  z-index: 10;
 `;
 
 const MainContent = styled.div`
@@ -66,27 +66,49 @@ const ApemanGraphContainer = styled.div`
 
 const App: React.FC = () => {
   const [panelWidth, setPanelWidth] = useState(300);
-
+  const [isResizing, setIsResizing] = useState(false);
   const [graphNodes, setGraphNodes] = useState<{ [key: string]: Node }>({});
   const [showPathfinder, setShowPathfinder] = useState(false);
   const { activeElement } = useApemanGraph();
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const startX = e.clientX;
-    const startWidth = panelWidth;
+  // Handle mouse movement for resizing
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (isResizing) {
+        const newWidth = panelWidth + e.movementX;
+        setPanelWidth(newWidth > 100 ? newWidth : 100); // Minimum width of 100px
+      }
+    },
+    [isResizing, panelWidth]
+  );
 
-    const onMouseMove = (e: MouseEvent) => {
-      const newWidth = startWidth + (e.clientX - startX);
-      setPanelWidth(newWidth > 100 ? newWidth : 100); // Minimum width of 100px
+  // Stop resizing on mouse up
+  const handleMouseUp = useCallback(() => {
+    if (isResizing) {
+      setIsResizing(false);
+    }
+  }, [isResizing]);
+
+  // Add and remove event listeners
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    } else {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    }
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
     };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+  // Start resizing on mouse down
+  const handleMouseDown = () => {
+    setIsResizing(true);
   };
 
   return (

@@ -62,7 +62,7 @@ const PermissionItem = ({ name, actions, resourceId }: Props) => {
   return (
     <AccordionItem key={name}>
       <h2>
-        <AccordionButton>
+        <AccordionButton onClick={populateActions()}>
           <Box as="span" flex="1" textAlign="left">
             <Text fontWeight="bold" fontSize="xs">
               {name}

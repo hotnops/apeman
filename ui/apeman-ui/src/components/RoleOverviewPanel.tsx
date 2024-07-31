@@ -16,7 +16,7 @@ interface Props {
   node: Node;
 }
 
-const RoleOverviewPanel = ({ node }) => {
+const RoleOverviewPanel = ({ node }: Props) => {
   const [attachedPolicies, setAttachedPolicies] = useState([]);
   const [inboundPaths, setInboundPaths] = useState([]);
   const [outboundPaths, setOutboundPaths] = useState([]);
@@ -161,7 +161,7 @@ const RoleOverviewPanel = ({ node }) => {
       </Card>
       <Card>
         <PermissionList
-          endpoint={`roles/${node.properties.map.roleid}/rsop`}
+          endpoint={`roles/${node.properties.map.roleid}/rsop/principals`}
           resourceId={() => node.id}
         >
           Resultant Set Of Policy

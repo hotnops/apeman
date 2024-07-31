@@ -9,6 +9,7 @@ import {
   Tbody,
   Td,
   Text,
+  Tooltip,
   Tr,
 } from "@chakra-ui/react";
 
@@ -59,8 +60,17 @@ const AccordionList = ({
           <Tbody>
             {paths.map((path) => (
               <Tr key={paths.indexOf(path)}>
-                <Td textOverflow="ellipsis" width="80%">
-                  <Text fontSize="xs">{pathLabelFunction(path) + "ASDF"}</Text>
+                <Td maxWidth={"20vw"}>
+                  <Tooltip label={pathLabelFunction(path)} hasArrow>
+                    <Text
+                      fontSize="xs"
+                      textOverflow="ellipsis"
+                      whiteSpace="nowrap"
+                      overflow="hidden"
+                    >
+                      {pathLabelFunction(path)}
+                    </Text>
+                  </Tooltip>
                 </Td>
 
                 {pathFunction && (

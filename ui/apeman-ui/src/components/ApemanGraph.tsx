@@ -105,7 +105,7 @@ const ApemanGraph = ({ setGraphNodes }: Props) => {
       edgeInterpolation="linear"
       labelType="all"
       theme={theme}
-      layoutType="treeTd2d"
+      layoutType="forceDirected2d"
       selections={activeElementId ? [activeElementId.toString()] : []}
       onCanvasClick={() => {
         setActiveElement(null);

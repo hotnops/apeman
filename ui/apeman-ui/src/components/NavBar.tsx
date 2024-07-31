@@ -76,6 +76,7 @@ const NavBar = ({ closeNavBar }: Props) => {
             nodes={searchResults}
             searchQuery={search}
             onItemSelect={(node) => {
+              console.log("Selected node" + node);
               addNode(node);
               setActiveNode(node);
               setSearch("");

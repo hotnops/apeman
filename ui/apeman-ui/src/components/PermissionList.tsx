@@ -19,37 +19,12 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
   const [_, setError] = useState<Error | null>(null);
   const [__, setLoading] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  const [paths, setPaths] = useState<PrincipalToActionMap>({});
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
-  };
-
-  function filterMapBySubstring(
-    map: PrincipalToActionMap,
-    query: string
-  ): PrincipalToActionMap {
-    const filteredMap: PrincipalToActionMap = {};
-
-    if (query === "") {
-      console.log(map);
-      return map;
-    }
-
-    for (const [key, value] of Object.entries(map)) {
-      if (value.some((str) => str.includes(query))) {
-        filteredMap[key] = value;
-      }
-    }
-    console.log(filteredMap);
-    return filteredMap;
-  }
+  const [principals, setPrincipals] = useState<string[]>([]);
 
   const fetchData = () => {
     const controller = new AbortController();
 
-    const request = apiClient.get<PrincipalToActionMap>(endpoint, {
+    const request = apiClient.get<string[]>(endpoint, {
       signal: controller.signal,
     });
 
@@ -69,7 +44,7 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
       .then((res) => {
         //setPermissions(res.data);
         // Create a string to action list map
-        setPaths(res.data);
+        setPrincipals(res.data);
       })
       .catch((err) => {
         setError(err);
@@ -82,20 +57,6 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
 
   return (
     <>
-      {showFilter && (
-        <HStack>
-          <Input onChange={handleInputChange}></Input>
-          <IconButton
-            aria-label="Filter actions"
-            icon={<IoCloseCircle />}
-            size="25px"
-            onClick={() => {
-              setShowFilter(false);
-              setSearchQuery("");
-            }}
-          ></IconButton>
-        </HStack>
-      )}
       <HStack justifyContent="space-between" paddingY={2}>
         <h1>
           <Text fontWeight="bold" fontSize="sm">
@@ -108,17 +69,15 @@ const PermissionList = ({ children, endpoint, resourceId }: Props) => {
           onClick={() => setShowFilter(true)}
         ></IconButton>
       </HStack>
-      <Accordion width="100%" allowMultiple={true}>
-        {Object.entries(filterMapBySubstring(paths, searchQuery)).map(
-          ([key, values]) => (
-            <PermissionItem
-              name={key}
-              actions={values}
-              resourceId={resourceId()}
-            ></PermissionItem>
-          )
-        )}
-      </Accordion>
+      {/* <Accordion width="100%" allowMultiple={true}>
+        {principals.map((path) => (
+          <PermissionItem
+            name={path}
+            actions={[]}
+            resourceId={resourceId()}
+          ></PermissionItem>
+        ))}
+      </Accordion> */}
     </>
   );
 };

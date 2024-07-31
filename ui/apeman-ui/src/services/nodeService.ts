@@ -66,9 +66,9 @@ export function getIconURL(nodeKinds: string[]): string {
   if (nodeKinds.includes(kinds.AWSPolicyDocument)) {
     return icon_dir + "policy_document_icon.svg";
   }
-  // if (nodeKinds.includes(kinds.AWSStatement)) {
-  //   return icon_dir + "statement_icon.svg";
-  // }
+  if (nodeKinds.includes(kinds.AWSStatement)) {
+    return icon_dir + "statement_icon.svg";
+  }
   if (nodeKinds.includes(kinds.AWSAssumeRolePolicy)) {
     return icon_dir + "assume_role_policy_icon.svg";
   }

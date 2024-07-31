@@ -30,7 +30,13 @@ const NodeOverviewPanel = ({ node }: Props) => {
 
   return (
     <>
-      <Tabs width="100%" isFitted variant="soft-rounded" size="sm">
+      <Tabs
+        width="100%"
+        height="100%"
+        isFitted
+        variant="soft-rounded"
+        size="sm"
+      >
         <TabList>
           {nodeKinds.map((kind) => (
             <Tab fontSize="xs" key={kind}>

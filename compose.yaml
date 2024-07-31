@@ -40,7 +40,7 @@ services:
     image: apeman-frontend
     labels:
       - traefik.enable=true
-      - traefik.http.routers.apeman-frontend.rule=Host(`apeman-frontend.localhost`)
+      - traefik.http.routers.apeman-frontend.rule=Host(`apeman.localhost`)
       - traefik.http.routers.apeman-frontend.service=apeman-frontend
       - traefik.http.services.apeman-frontend.loadbalancer.server.port=80
 
