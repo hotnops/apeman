@@ -8,3 +8,4 @@ import/
 node_modules/
 gaad/
 go-mod-cache/
+cmd/api/main

@@ -19,9 +19,6 @@ import {
   Tr,
   IconButton,
   Skeleton,
-  Stack,
-  Card,
-  SkeletonText,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { PiGraph } from "react-icons/pi";
@@ -32,10 +29,8 @@ import nodeService, {
 } from "../services/nodeService";
 import resourceService from "../services/resourceService";
 import {
-  GetNodePermissionPath,
   GetNodePermissionPathWithAction,
   addPathToGraph,
-  addPathsToGraph,
 } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 
@@ -79,30 +74,6 @@ const ResourceOverview = ({ node }: Props) => {
       });
 
     return cancel;
-  };
-
-  const handlePrincipalClick = (
-    principalArn: string,
-    resourceId: number,
-    action: string
-  ) => {
-    try {
-      const { request } = nodeService.getNodeByArn(principalArn);
-      request.then((res) => {
-        if (res.data.length === 0) {
-          console.error("Node not found");
-          return;
-        }
-        const prinNode = res.data[0];
-        handlePrincipalToResourceWithActionPathClick(
-          prinNode.id,
-          resourceId,
-          action
-        );
-      });
-    } catch (error) {
-      console.error("Error in getting node by ARN:", error);
-    }
   };
 
   const handleActionAccordionChange = async (index: number | number[]) => {

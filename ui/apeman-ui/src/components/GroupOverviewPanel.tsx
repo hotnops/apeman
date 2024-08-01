@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import { Path, addPathToGraph } from "../services/pathService";
-import nodeService, { Node } from "../services/nodeService";
+import { Node } from "../services/nodeService";
 import { Accordion, Card, Table, Tbody, Td, Text, Tr } from "@chakra-ui/react";
 import PathAccordionList from "./PathAccordionList";
-import AccordionList from "./AccordionList";
-import PermissionList from "./PermissionList";
-import UserService, { GetOutboundRoles } from "../services/userService";
+//import AccordionList from "./AccordionList";
+
 import InlinePolicy from "./InlinePolicy";
 import groupService from "../services/groupService";
 
@@ -15,7 +14,6 @@ interface Props {
 }
 
 const GroupOverviewPanel = ({ node }: Props) => {
-  const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
   const [membershipPaths, setMembershipPaths] = useState<Path[]>([]);
   const { addNode, addEdge } = useApemanGraph();
 
@@ -83,12 +81,12 @@ const GroupOverviewPanel = ({ node }: Props) => {
             pathLabelFunction={(n) => n.Nodes[0].properties.map.arn}
           ></PathAccordionList>
         </Accordion>
-        <Accordion allowMultiple={true} width="100%">
+        {/* <Accordion allowMultiple={true} width="100%">
           <AccordionList
             nodes={attachedPolicies}
             name="Attached Policies"
           ></AccordionList>
-        </Accordion>
+        </Accordion> */}
         <InlinePolicy principalNode={node} />
       </Card>
     </>

@@ -1,10 +1,12 @@
 import apiClient from "./api-client";
+import { NodeResponse } from "./nodeService";
+import { Path } from "./pathService";
 
 const BASE_PATH = "/roles";
 
 export function GetInboundRoles(roleId: string) {
   const controller = new AbortController();
-  const request = apiClient.get(`/roles/${roleId}/inboundroles`, {
+  const request = apiClient.get<Path[]>(`/roles/${roleId}/inboundroles`, {
     signal: controller.signal,
   });
 
@@ -18,7 +20,7 @@ export function GetInboundRoles(roleId: string) {
 
 export function GetOutboundRoles(roleId: string) {
   const controller = new AbortController();
-  const request = apiClient.get(`/roles/${roleId}/outboundroles`, {
+  const request = apiClient.get<Path[]>(`/roles/${roleId}/outboundroles`, {
     signal: controller.signal,
   });
 
@@ -77,7 +79,7 @@ class RoleService {
   getRoleManagedPolicyNodes(roleid: string) {
     const controller = new AbortController();
 
-    const request = apiClient.get(BASE_PATH + "/" + roleid + "/managedpolicies", {
+    const request = apiClient.get<NodeResponse>(BASE_PATH + "/" + roleid + "/managedpolicies", {
       signal: controller.signal,
     });
 

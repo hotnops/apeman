@@ -2,16 +2,15 @@ import {
   Card,
   HStack,
   useTheme,
-  IconButton,
   Tabs,
   TabList,
   Tab,
   TabPanel,
   TabPanels,
+  IconButton,
 } from "@chakra-ui/react";
 import { Node } from "../services/nodeService";
 import { useEffect, useRef, useState } from "react";
-import { IoClose } from "react-icons/io5";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import {
   GetNodePermissionPath,
@@ -24,6 +23,7 @@ import { FaUser } from "react-icons/fa";
 import { MdChecklist } from "react-icons/md";
 import { FaArrowsAltH } from "react-icons/fa";
 import PermissionPathFinder from "./PermissionPathFinder";
+import { IoClose } from "react-icons/io5";
 
 interface Props {
   onClose: () => void;
@@ -35,13 +35,6 @@ const Pathfinder = ({ onClose }: Props) => {
   const wrapperRef = useRef(null);
   const { addNode, addEdge } = useApemanGraph();
   const theme = useTheme();
-
-  //   useEffect(() => {
-  //     document.addEventListener("mousedown", handleFocusChange);
-  //     return () => {
-  //       document.removeEventListener("mousedown", handleFocusChange);
-  //     };
-  //   });
 
   useEffect(() => {
     if (pathNodes.length < 2) {
@@ -98,7 +91,15 @@ const Pathfinder = ({ onClose }: Props) => {
         margin="5px"
         backgroundColor={theme.colors.white}
       >
-        <HStack justifyContent="right">{/* / */}</HStack>
+        <HStack justifyContent="right">
+          <IconButton
+            aria-label="close nav"
+            icon={<IoClose></IoClose>}
+            isRound={true}
+            onClick={onClose}
+            size="xs"
+          />
+        </HStack>
         <Tabs onChange={(index) => setTabIndex(index)}>
           <TabList>
             <Tab>

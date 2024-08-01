@@ -4,15 +4,12 @@ import { Accordion, Table, Tbody, Text, Td, Tr, Card } from "@chakra-ui/react";
 import RoleService, {
   GetInboundRoles,
   GetOutboundRoles,
-  GetRoleRSOPActions,
 } from "../services/roleService";
 import AccordionList from "./AccordionList";
-import { addPathToGraph } from "../services/pathService";
+import { Path, addPathToGraph } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import PathAccordionList from "./PathAccordionList";
-import PermissionList from "./PermissionList";
 import InlinePolicy from "./InlinePolicy";
-import ActionPathList from "./ActionPathList";
 import RSOPPanel from "./RSOPPanel";
 
 interface Props {
@@ -20,10 +17,9 @@ interface Props {
 }
 
 const RoleOverviewPanel = ({ node }: Props) => {
-  const [attachedPolicies, setAttachedPolicies] = useState([]);
-  const [inboundPaths, setInboundPaths] = useState([]);
-  const [outboundPaths, setOutboundPaths] = useState([]);
-  const [rsopActionMap, setRsopActionMap] = useState({});
+  const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
+  const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
+  const [outboundPaths, setOutboundPaths] = useState<Path[]>([]);
   const { addNode, addEdge } = useApemanGraph();
 
   useEffect(() => {
@@ -89,21 +85,6 @@ const RoleOverviewPanel = ({ node }: Props) => {
 
     return cancel;
   }, [node.properties.map.roleid]);
-
-  useEffect(() => {
-    const { request, cancel } = GetRoleRSOPActions(node.properties.map.roleid);
-    request
-      .then((res) => {
-        setRsopActionMap(res.data);
-      })
-      .catch((error) => {
-        if (error.code !== "ERR_CANCELED") {
-          console.error("Error fetching RSOP action map:", error);
-        }
-      });
-
-    return cancel;
-  }, [node]);
 
   return (
     <>

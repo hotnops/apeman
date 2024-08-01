@@ -18,6 +18,12 @@ export interface Node {
   properties: Properties;
 }
 
+export interface NodeResponse {
+  version: string
+  count: number
+  nodes: Node[]
+}
+
 export enum kinds {
   AWSAccount = "AWSAccount",
   AWSRole = "AWSRole",

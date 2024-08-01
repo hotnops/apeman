@@ -1,12 +1,8 @@
-import { Accordion, Table, Tbody, Td, Tr } from "@chakra-ui/react";
+import { Accordion } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { getNodeLabel, Node } from "../services/nodeService";
 
-import AccordionList from "./AccordionList";
-import statementService, {
-  fetchAllStatementData,
-  StatementDetails,
-} from "../services/statementService";
+import statementService from "../services/statementService";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/default-highlight";
 import PathAccordionList from "./PathAccordionList";
 import { addPathToGraph, Path } from "../services/pathService";

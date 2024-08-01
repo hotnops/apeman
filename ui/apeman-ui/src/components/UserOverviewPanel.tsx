@@ -2,31 +2,13 @@ import { useEffect, useState } from "react";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import { Path, addPathToGraph } from "../services/pathService";
 import nodeService, { Node } from "../services/nodeService";
-import {
-  Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
-  Box,
-  Card,
-  Skeleton,
-  Table,
-  Tbody,
-  Td,
-  Text,
-  Tr,
-} from "@chakra-ui/react";
+import { Accordion, Card, Table, Tbody, Td, Text, Tr } from "@chakra-ui/react";
 import PathAccordionList from "./PathAccordionList";
 import AccordionList from "./AccordionList";
-import PermissionList from "./PermissionList";
-import UserService, {
-  GetOutboundRoles,
-  GetUserRSOPActions,
-} from "../services/userService";
+
+import UserService, { GetOutboundRoles } from "../services/userService";
 import InlinePolicy from "./InlinePolicy";
-import ActionPathList from "./ActionPathList";
-import { RiSpace } from "react-icons/ri";
+
 import RSOPPanel from "./RSOPPanel";
 
 interface Props {

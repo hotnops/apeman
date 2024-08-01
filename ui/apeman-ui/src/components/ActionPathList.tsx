@@ -5,8 +5,6 @@ import {
   AccordionItem,
   AccordionPanel,
   Box,
-  Button,
-  HStack,
   IconButton,
   Table,
   Tbody,
@@ -14,7 +12,6 @@ import {
   Text,
   Tr,
 } from "@chakra-ui/react";
-import React from "react";
 
 import {
   ActionPathEntry,

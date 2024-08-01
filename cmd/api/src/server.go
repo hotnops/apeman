@@ -798,21 +798,6 @@ func (s *Server) GetUserRSOPActions(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, principalMap)
 }
 
-func (s *Server) GetAWSTierZeroNodes(c *gin.Context) {
-	accountId := c.Param("nodeid")
-	query := fmt.Sprintf("MATCH (n) WHERE n.tier_zero = true AND n.account_id = '%s' RETURN n", accountId)
-	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
-
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	}
-	if len(paths) == 0 {
-		c.IndentedJSON(http.StatusOK, []string{})
-	} else {
-		c.IndentedJSON(http.StatusOK, paths.AllNodes().Slice())
-	}
-}
-
 func (s *Server) GetAllAssumeRoles(c *gin.Context) {
 	err := queries.CreateAssumeRoleEdges(s.ctx, s.db)
 
@@ -878,21 +863,6 @@ func (s *Server) GetStatementPolicies(c *gin.Context) {
 
 }
 
-func (s *Server) GetAWSTierZeroPaths(c *gin.Context) {
-	accountId := c.Param("nodeid")
-	query := fmt.Sprintf("MATCH p=() - [:CanAssume*1..4] -> (t:AWSRole) WHERE t.tier_zero = true AND t.account_id = '%s' RETURN p", accountId)
-	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
-
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	}
-	if len(paths) == 0 {
-		c.IndentedJSON(http.StatusOK, []string{})
-	} else {
-		c.IndentedJSON(http.StatusOK, paths)
-	}
-}
-
 func (s *Server) handleRequests() {
 	router := gin.Default()
 	router.Use(corsMiddleware())
@@ -936,8 +906,6 @@ func (s *Server) handleRequests() {
 	router.GET("/node/:nodeid/inboundedges", s.GetAWSNodeInboundEdges)
 	router.GET("/node/:nodeid/outboundedges", s.GetAWSNodeOutboundEdges)
 	router.GET("/node/:nodeid/tags", s.GetAWSNodeTags)
-	router.GET("/node/:nodeid/tierzero", s.GetAWSTierZeroNodes) // This needs to be redone
-	router.GET("/node/:nodeid/tierzeropaths", s.GetAWSTierZeroPaths)
 	router.GET("/permissionpath/:sourcenodeid/:destnodeid", s.GetNodePermissionPath)
 	router.GET("/relationship/:relationshipid", s.GetAWSRelationshipByGraphID)
 	router.GET("/analyze/assumeroles", s.GetAllAssumeRoles)
