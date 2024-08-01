@@ -290,6 +290,19 @@ func (s *Server) GetRoleInlinePolicies(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, returnValue)
 }
 
+func (s *Server) GenerateAssumeRolePolicy(c *gin.Context) {
+	propertyName := "roleid"
+	id := c.Param(propertyName)
+
+	policy, err := queries.GenerateAssumeRolePolicy(s.ctx, s.db, id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, policy)
+
+}
+
 func (s *Server) GetUserInlinePolicies(c *gin.Context) {
 	propertyName := "userid"
 	id := c.Param(propertyName)
@@ -869,6 +882,7 @@ func (s *Server) handleRequests() {
 	router.GET("/roles/:roleid", s.GetAWSRole)
 	router.GET("/roles/:roleid/managedpolicies", s.GetRoleManagedPolicies)
 	router.GET("/roles/:roleid/inlinepolicies", s.GetRoleInlinePolicies)
+	router.GET("/roles/:roleid/generateassumerolepolicy", s.GenerateAssumeRolePolicy)
 	router.GET("/roles/:roleid/inboundroles", s.GetInboundRoles)
 	router.GET("/roles/:roleid/outboundroles", s.GetRoleOutboundRoles)
 	router.GET("/roles/:roleid/rsop", s.GetRoleRSOP)

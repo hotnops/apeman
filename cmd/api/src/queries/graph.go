@@ -668,6 +668,45 @@ func GetPathsWithStatement(paths graph.PathSet, statement *graph.Node) graph.Pat
 	return pathsWithStatement
 }
 
+func GenerateAssumeRolePolicy(ctx context.Context, db graph.Database, roleId string) (map[string]any, error) {
+	statementQuery := "MATCH (a:AWSRole {roleid: $roleId}) <- [:AttachedTo] - (p:AWSAssumeRolePolicy) <- [:AttachedTo] - (s:AWSStatement) RETURN s"
+	statementParams := map[string]any{"roleId": roleId}
+
+	statementResults, err := RawCypherQuery(ctx, db, statementQuery, statementParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(statementResults) == 0 {
+		return nil, fmt.Errorf("no statements found for policy")
+	}
+
+	statements := []map[string]any{}
+
+	for _, result := range statementResults {
+
+		var statement graph.Node
+		err = result.Map(&statement)
+		if err != nil {
+			continue
+		}
+
+		statementObject, err := GenerateStatementObject(ctx, db, statement)
+		if err != nil {
+			log.Printf("[!] error generating statement object: %s", err.Error())
+			continue
+		}
+
+		statements = append(statements, statementObject)
+	}
+
+	policyObject := map[string]any{}
+	policyObject["Statement"] = statements
+
+	return policyObject, nil
+}
+
 func GenerateInlinePolicyObject(ctx context.Context, db graph.Database, policyHash string) (map[string]any, error) {
 
 	// Get each statement in the policy
@@ -945,23 +984,54 @@ func GenerateStatementObject(ctx context.Context, db graph.Database, statement g
 		}
 	}
 
-	if len(resourcesResults) == 0 {
-		return nil, fmt.Errorf("no resources found for statement")
-	}
+	if len(resourcesResults) != 0 {
+		resources := []string{}
 
-	resources := []string{}
+		for _, result := range resourcesResults {
+			var resource string
+			err = result.Map(&resource)
+			if err != nil {
+				continue
+			}
 
-	for _, result := range resourcesResults {
-		var resource string
-		err = result.Map(&resource)
-		if err != nil {
-			continue
+			resources = append(resources, resource)
 		}
 
-		resources = append(resources, resource)
+		statementObject["Resource"] = resources
 	}
 
-	statementObject["Resource"] = resources
+	principalsQuery := "MATCH (s:AWSStatement) - [:Principal] -> (p) WHERE ID(s) = $statement_id RETURN COALESCE(p.name, p.arn)"
+	principalsResults, err := RawCypherQuery(ctx, db, principalsQuery, queryParams)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(principalsResults) == 0 {
+		notPrincipalsQuery := "MATCH (s:AWSStatement) - [:NotPrincipal] -> (p:AWSPrincipalBlob) WHERE ID(s) = $statement_id RETURN p.name"
+		principalsResults, err = RawCypherQuery(ctx, db, notPrincipalsQuery, queryParams)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(principalsResults) != 0 {
+		principals := []string{}
+
+		for _, result := range principalsResults {
+			var principal string
+			err = result.Map(&principal)
+			if err != nil {
+				continue
+			}
+
+			principals = append(principals, principal)
+		}
+
+		statementObject["Principal"] = principals
+
+	}
 
 	conditionsQuery := "MATCH (s:AWSStatement) <- [:AttachedTo] - (c:AWSCondition) WHERE ID(s) = $statement_id RETURN c"
 	conditionsResults, err := RawCypherQuery(ctx, db, conditionsQuery, queryParams)

@@ -11,6 +11,7 @@ import { useApemanGraph } from "../hooks/useApemanGraph";
 import PathAccordionList from "./PathAccordionList";
 import InlinePolicy from "./InlinePolicy";
 import RSOPPanel from "./RSOPPanel";
+import AssumeRolePolicyPanel from "./AssumeRolePolicyPanel";
 
 interface Props {
   node: Node;
@@ -157,6 +158,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
             name="Managed Policies"
           ></AccordionList>
         </Accordion>
+        <AssumeRolePolicyPanel roleNode={node} />
         <InlinePolicy principalNode={node} />
       </Card>
       <Card>

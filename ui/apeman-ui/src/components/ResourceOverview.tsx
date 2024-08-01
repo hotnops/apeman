@@ -19,6 +19,7 @@ import {
   Tr,
   IconButton,
   Skeleton,
+  HStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { PiGraph } from "react-icons/pi";
@@ -33,6 +34,7 @@ import {
   addPathToGraph,
 } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
+import Export from "./Export";
 
 interface Props {
   node: Node;
@@ -198,9 +200,12 @@ const ResourceOverview = ({ node }: Props) => {
 
   return (
     <Box height="100vh" display="flex" flexDirection="column">
-      <Text fontSize="md" as="b">
-        Inbound Permissions
-      </Text>
+      <HStack justifyContent={"space-between"}>
+        <Text fontSize="md" as="b">
+          Inbound Permissions
+        </Text>
+        <Export object={actionPanelData}></Export>
+      </HStack>
       <Tabs flex="1" display="flex" flexDirection="column">
         <TabList>
           <Tab>Actions</Tab>

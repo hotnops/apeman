@@ -105,6 +105,21 @@ class RoleService {
       },
     };
   }
+
+  getAssumeRolePolicyObject(roleid: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get(BASE_PATH + "/" + roleid + "/generateassumerolepolicy", {
+      signal: controller.signal,
+    });
+
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
 }
 
 export default new RoleService();

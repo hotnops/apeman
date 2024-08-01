@@ -23,7 +23,7 @@ const NodeSuggestions = ({ nodes, onItemSelect }: Props) => {
       width="100%"
       backgroundColor={theme.colors.white}
     >
-      {nodes.slice(0, 5).map((node) => (
+      {nodes.slice(0, 20).map((node) => (
         <ListItem
           border={10}
           _hover={{ bg: theme.colors.gray[50] }}
