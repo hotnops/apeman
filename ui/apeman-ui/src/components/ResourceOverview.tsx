@@ -34,7 +34,6 @@ import {
   addPathToGraph,
 } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
-import Export from "./Export";
 
 interface Props {
   node: Node;
@@ -198,13 +197,16 @@ const ResourceOverview = ({ node }: Props) => {
     };
   }, [node]);
 
+  useEffect(() => {
+    console.log("actionPanelData updated:", actionPanelData);
+  }, [actionPanelData]);
+
   return (
     <Box height="100vh" display="flex" flexDirection="column">
       <HStack justifyContent={"space-between"}>
         <Text fontSize="md" as="b">
           Inbound Permissions
         </Text>
-        <Export object={actionPanelData}></Export>
       </HStack>
       <Tabs flex="1" display="flex" flexDirection="column">
         <TabList>

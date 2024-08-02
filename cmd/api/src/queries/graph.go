@@ -418,7 +418,7 @@ func CreateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
 func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalNode *graph.Node) (analyze.ActionPathSet, error) {
 	// First, get all resources that this principal has a path to, regardless of deny or allow
 	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSManagedPolicy|AWSInlinePolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b:UniqueArn) " +
-		"WHERE ID(a) = %d AND a.account_id = b.account_id  " +
+		"WHERE ID(a) = %d AND a.account_id = b.account_id OR b.account_id = '' " +
 		"WITH a, s, b " +
 		"MATCH p2=(a) <- [:AttachedTo*3..4] - (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction) " +
 		"WHERE (act) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
@@ -1154,7 +1154,8 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 	query := "MATCH (b:UniqueArn) " +
 		"WHERE b.arn = $targetArn " +
 		"MATCH (a:AWSUser|AWSRole) " +
-		"WHERE a.account_id = b.account_id " +
+		// Some resources, like s3 buckets, don't have account ids
+		"WHERE a.account_id = b.account_id OR b.account_id = '' " +
 		"MATCH p1=(a) <- [:AttachedTo*3..4] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) " +
 		"WITH a, s, b " +
 		"MATCH p2 = (s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
@@ -1231,7 +1232,8 @@ func GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx context.Context, db 
 func GetAllUnresolvedIdentityPolicyPathsOnArn(ctx context.Context, db graph.Database, arn string) (*analyze.ActionPathSet, error) {
 
 	query := "MATCH (b:UniqueArn) WHERE b.arn = '%s' " +
-		"MATCH (a:AWSUser|AWSRole) WHERE a.account_id = b.account_id " +
+		"MATCH (a:AWSUser|AWSRole) " +
+		"WHERE a.account_id = b.account_id OR b.account_id = '' " +
 		"OPTIONAL MATCH p1=(a) <- [:AttachedTo*3..4] - (s1:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s1) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"OPTIONAL MATCH p2=(a) - [:MemberOf] -> (:AWSGroup) <- [:AttachedTo*3..4] - (s2:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) WHERE (s2) - [:Action|ExpandsTo*1..2] -> (:AWSAction) - [:ActsOn] -> (:AWSResourceType) <- [:TypeOf] - (b) " +
 		"WITH collect(p1) + collect(p2) AS paths, collect(s1) + collect(s2) as statements, b, a WHERE paths IS NOT NULL " +
