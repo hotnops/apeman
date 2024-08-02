@@ -117,7 +117,7 @@ const App: React.FC = () => {
         <Tabs variant={"soft-rounded"} padding="10px">
           <TabList>
             <Tab>Explorer</Tab>
-            <Tab>Context Manager</Tab>
+            {/* <Tab>Context Manager</Tab> */}
           </TabList>
         </Tabs>
       </Header>
