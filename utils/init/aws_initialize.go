@@ -126,7 +126,7 @@ func get_services_json_href(url string) map[string]string {
 			//printSubsections(y)
 			for _, subContent := range y.Contents {
 
-				serviceList[subContent.Title] = serviceList[subContent.Href]
+				serviceList[subContent.Title] = subContent.Href
 			}
 
 		}
@@ -148,6 +148,7 @@ func get_service_dict(link string) ([]Actions, error) {
 	error_check(err)
 
 	var details []Actions
+	re := regexp.MustCompile(" +")
 
 	//table #may change with each html response so I should figure out how to add programatically
 	doc.Find("table").Eq(0).Each(func(column int, tr *goquery.Selection) {
@@ -158,35 +159,39 @@ func get_service_dict(link string) ([]Actions, error) {
 
 				if col == 0 && td.Text() != "" {
 					if table_length == 3 {
-						//fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+
 						detail.ResourceType = strings.TrimSpace(td.Text())
+					} else if table_length == 4 {
+						detail.Description = strings.TrimSpace(td.Text())
 					} else {
-						//fmt.Printf("Actions:  %s\n", strings.TrimSpace(td.Text()))
+
 						detail.Action = strings.TrimSpace(td.Text())
 					}
 
 				} else if col == 1 && td.Text() != "" {
 					if table_length == 3 {
-						//fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
-						detail.ConditionKeys = strings.TrimSpace(td.Text())
+
+						text := strings.TrimSpace(td.Text())
+						text = re.ReplaceAllString(text, " ")
+						text = strings.ReplaceAll(text, "\n", " ")
+						detail.ConditionKeys = text
 					} else {
-						//fmt.Printf("Description:  %s\n", strings.TrimSpace(td.Text()))
+
 						detail.Description = strings.TrimSpace(td.Text())
 					}
-
 				} else if col == 2 && td.Text() != "" {
-					//fmt.Printf("Access Level:  %s\n", strings.TrimSpace(td.Text()))
+
 					detail.Accesslevel = strings.TrimSpace(td.Text())
 
 				} else if col == 3 {
-					//fmt.Printf("Resource Type:  %s\n", strings.TrimSpace(td.Text()))
+
 					detail.ResourceType = strings.TrimSpace(td.Text())
 
 				} else if col == 4 {
-					//fmt.Printf("Condition Keys:  %s\n", strings.TrimSpace(td.Text()))
-					detail.ConditionKeys = strings.TrimSpace(td.Text())
 
-				} else {
+					text := strings.TrimSpace(td.Text())
+					text = strings.ReplaceAll(text, "\n", ", ")
+					detail.ConditionKeys = text
 
 				}
 			})
@@ -244,26 +249,45 @@ func main() {
 	error_check(err)
 
 	actionMap := make(map[string]Actions)
+	serviceMap := make(map[string]interface{})
 
 	//awsglobalconditionkeys.csv
 	write_data_to_csv("awsglobalconditionkeys.csv", services_metadata.ConditionKeys)
+	fmt.Println("[*] Condition keys written to awsglobalconditionkeys.csv")
+
 	//awsoperators.csv
 	write_data_to_csv("awsoperators.csv", services_metadata.ConditionOperators)
+	fmt.Println("[*] Operators written to awsoperators.csv")
 
+	fmt.Println("[*] Gathering URLs of services")
 	href := get_services_json_href(service_json_url)
 
-	for _, x := range href {
-		action_metadata, err := get_service_dict(base_url + x)
+	fmt.Println("[*] Gathering Metadata of services")
+	for title, url := range href {
+		action_metadata, err := get_service_dict(base_url + url)
 		error_check(err)
 
 		for _, items := range action_metadata {
 			actionMap[items.Action] = items
-		}
 
+		}
+		serviceMap[title] = actionMap
 	}
 
-	json_output, err := json.MarshalIndent(actionMap, "", " ")
+	//write json file
+	fmt.Println("[*] Writing to json file")
+
+	//convert servicemap to json
+	json_output, err := json.MarshalIndent(serviceMap, "", "  ")
 	error_check(err)
-	println(string(json_output))
+
+	//create and write to file
+	aws_scheme_filewriter, err := os.Create("awsschema-test.json")
+	error_check(err)
+
+	defer aws_scheme_filewriter.Close()
+	aws_scheme_filewriter.Write(json_output)
+
+	fmt.Println("[*] Data written to awsschema.json")
 
 }
