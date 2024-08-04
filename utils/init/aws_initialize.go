@@ -23,11 +23,11 @@ type PolicyEditorConfig struct {
 
 // ServiceDetails represents the details of each service in the service map
 type ServiceDetails struct {
-	StringPrefix string   `json:"StringPrefix"`
-	Actions      map[string]Actions `json:"Actions"`
-	ARNFormat    string   `json:"ARNFormat"`
-	ARNRegex     string   `json:"ARNRegex"`
-	HasResource  bool     `json:"HasResource"`
+	//StringPrefix string   `json:"StringPrefix"`
+	Actions     []string `json:"Actions"`
+	ARNFormat   string   `json:"ARNFormat"`
+	ARNRegex    string   `json:"ARNRegex"`
+	HasResource bool     `json:"HasResource"`
 }
 
 type Content struct {
@@ -41,14 +41,6 @@ type Root struct {
 }
 
 type Actions struct {
-	Action        string
-	Description   string
-	Accesslevel   string
-	ResourceType  string
-	ConditionKeys string
-}
-
-type actionInformation struct {
 	Action        string
 	Description   string
 	Accesslevel   string
@@ -82,7 +74,9 @@ func get_service_metadata(url string) (*PolicyEditorConfig, error) {
 	edit := output.ReplaceAllString(string(body), "")
 
 	err = json.Unmarshal([]byte(edit), &config)
-	error_check(err)
+	if err != nil {
+		error_check(err)
+	}
 
 	// Print the parsed data
 
@@ -104,7 +98,7 @@ func get_service_metadata(url string) (*PolicyEditorConfig, error) {
 	return &config, nil
 }
 
-func get_services_json_href(url string) []string {
+func get_services_json_href(url string) map[string]string {
 
 	//web request
 	response, err := http.Get(url)
@@ -122,21 +116,23 @@ func get_services_json_href(url string) []string {
 		fmt.Println("Error with unmarshal:", err)
 	}
 
-	var hrefList []string
+	//var serviceList []string
+
+	serviceList := make(map[string]string)
 
 	for _, data := range contents.Contents {
 		//fmt.Println(data.Contents)
 		for _, y := range data.Contents {
 			//printSubsections(y)
 			for _, subContent := range y.Contents {
-				hrefList = append(hrefList, subContent.Href)
-				//fmt.Println(subContent.Href)
+
+				serviceList[subContent.Title] = serviceList[subContent.Href]
 			}
 
 		}
 	}
 
-	return hrefList
+	return serviceList
 
 }
 
@@ -241,38 +237,33 @@ func error_check(err error) {
 
 func main() {
 	service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
-	//base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
-	//service_json_url := base_url + "toc-contents.json"
+	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
+	service_json_url := base_url + "toc-contents.json"
 
 	services_metadata, err := get_service_metadata(service_url)
 	error_check(err)
+
+	actionMap := make(map[string]Actions)
 
 	//awsglobalconditionkeys.csv
 	write_data_to_csv("awsglobalconditionkeys.csv", services_metadata.ConditionKeys)
 	//awsoperators.csv
 	write_data_to_csv("awsoperators.csv", services_metadata.ConditionOperators)
 
-	// for service, data := range services_metadata.ServiceMap {
-	// 	fmt.Println(service)
-	// 	for _, actions := range data.Actions {
-	// 		fmt.Println("\t", actions)
-	// 	}
-	// }
+	href := get_services_json_href(service_json_url)
 
-	//for _, links := range get_services_json_href(service_json_url) {
-	//action_metadata, err := get_service_dict(base_url + links)
+	for _, x := range href {
+		action_metadata, err := get_service_dict(base_url + x)
+		error_check(err)
 
-	action_metadata, err := get_service_dict("https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsactivate.html")
+		for _, items := range action_metadata {
+			actionMap[items.Action] = items
+		}
+
+	}
+
+	json_output, err := json.MarshalIndent(actionMap, "", " ")
 	error_check(err)
-
-	output, err := json.Marshal(action_metadata)
-	error_check(err)
-	// for _, items := range action_metadata {
-	// 	fmt.Println("\tAction:", items.Action)
-	// 	fmt.Println("\tDescription:", items.Description)
-	// 	fmt.Println("\tAccessLevel:", items.Accesslevel)
-	// }
-	fmt.Println(string(output))
-	//}
+	println(string(json_output))
 
 }
