@@ -64,6 +64,9 @@ Next, for every account you want analyzed, perform the following action
 
 ```
 aws iam get-account-authorization-details > gaad/<account_number>.json
+```
+Optionally, you can obtain a list of all the ARNs in the account. This may help produce more accurate results
+```
 aws resource-explorer-2 search --query-string "*" | jq -r '.Resources[] | [.Arn] | @csv' >> import/arns.csv
 ```
 
