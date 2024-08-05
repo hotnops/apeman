@@ -9,7 +9,13 @@
 - Docker
 - Docker compose
 - Python 3
+```
+sudo apt install python
+```
 - Python Virtual Environment
+```
+sudo apt install python3-dev
+```
 
 ## Running Apeman
 
