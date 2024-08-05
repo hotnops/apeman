@@ -2,48 +2,32 @@
 import arn
 import re
 import requests
+import time
 
 from neo4j import GraphDatabase
 
 def populate_principal_blob(session):  
     print("[*] Expanding principal blobs")
     cypher_query = """
-    CALL apoc.periodic.iterate(
-        "MATCH (a:AWSPrincipalBlob) RETURN a",
-        "
+        MATCH (a:AWSPrincipalBlob)
         MATCH (b:AWSUser|AWSRole|AWSGroup|AWSIdentityProvider|AWSService)
         WHERE b.arn =~ a.regex OR b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
-        ",
-        {batchSize: 10, parallel: false}
-    )
     """
     session.run(cypher_query)
 
 def populate_resource_blob(session):
     print("[*] Expanding resource blobs")
+
     cypher_query = """
-    CALL apoc.periodic.iterate(
-        "MATCH (a:AWSResourceBlob) RETURN a",
-        "
+        MATCH (a:AWSResourceBlob)
         MATCH (b:UniqueArn)
         WHERE b.arn =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
-        ",
-        {
-            batchSize: 10, 
-            parallel: true
-        }
-    ) YIELD batch, failedBatches, errorMessages
-    RETURN batch, failedBatches, errorMessages
     """
-    result = session.run(cypher_query)
-    
-    for record in result:
-        if record['failedBatches'] > 0:
-            print(f"Batch {record['batch']} failed with errors: {record['errorMessages']}")
-        else:
-            print(f"Batch {record['batch']} processed successfully")
+
+    session.run(cypher_query)
+
 
 
 # def populate_not_resources(session):
@@ -64,15 +48,10 @@ def populate_resource_blob(session):
 def populate_action_blob(session):
     print("[*] Expanding action blobs")
     cypher_query = """
-    CALL apoc.periodic.iterate(
-        "MATCH (a:AWSActionBlob) RETURN a",
-        "
+        MATCH (a:AWSActionBlob)
         MATCH (b:AWSAction)
         WHERE b.name =~ a.regex
         MERGE (a) - [:ExpandsTo {layer: 2}] -> (b)
-        ",
-        {batchSize: 10, parallel: false}
-    )
     """
     session.run(
         cypher_query
@@ -112,24 +91,18 @@ def get_all_arn_nodes(session):
 
 def populate_resource_types(session):
     print("[*] Expanding resources types")
-    print("[*] Getting all resource types")
     cypher_query = """
-    CALL apoc.periodic.iterate(
-        "MATCH (a:AWSResourceType) RETURN a",
-        "MATCH (b:UniqueArn) WHERE (b.arn =~ a.regex)
-         MERGE (b)  - [:TypeOf {layer: 2}] -> (a)",
-        {batchSize: 10, parallel: true}
-        )
+        MATCH (a:AWSResourceType)
+        MATCH (b:UniqueArn) WHERE (b.arn =~ a.regex)
+        MERGE (b)  - [:TypeOf {layer: 2}] -> (a)
     """
     session.run(cypher_query)
 
 
 def populate_arn_fields(session):
-    print("[*] Extrapolating ARN properties")
+    print("[*] Populating ARN fields")
     cypher_query = """
-    CALL apoc.periodic.iterate(
-        "MATCH (u:UniqueArn) RETURN u",
-        "
+        MATCH (u:UniqueArn)
         WITH u, apoc.text.regexGroups(u.arn, 'arn:([^:]*):([^:]*):([^:]*):([^:]*):(.+)')[0] AS arn_parts
         WHERE size(arn_parts) = 6
         SET u.partition = arn_parts[1],
@@ -137,12 +110,9 @@ def populate_arn_fields(session):
             u.region = arn_parts[3],
             u.account_id = arn_parts[4],
             u.resource = arn_parts[5]
-        RETURN u, arn_parts
-        ",
-        {batchSize: 1000, parallel: true}
-    )
     """
     session.run(cypher_query)
+
 
 def analyze_assume_roles():
     print("[*] Analyzing assume roles")
