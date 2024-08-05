@@ -8,6 +8,8 @@ import nodeService, { Node, getNodeLabel } from "../services/nodeService";
 import accountService from "../services/accountService";
 import { Box } from "@chakra-ui/react";
 
+import { BiMinus, BiPlus } from "react-icons/bi";
+
 interface ExtendedTreeNode extends BaseTreeNode {
   type: string;
   items?: ExtendedTreeNode[];
@@ -117,6 +119,17 @@ const NodeExplorer: FC<Props> = ({ setGraphNodes }) => {
               fetchNode(node as string);
             }
           });
+        }}
+        RenderIcon={({ open, type }) => {
+          if (type == "node") {
+            if (open) {
+              return <BiMinus style={{ transform: "rotate(90deg)" }} />;
+            } else {
+              return <BiPlus />;
+            }
+          } else {
+            return <></>;
+          }
         }}
       />
     </Box>
