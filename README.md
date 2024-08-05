@@ -4,6 +4,8 @@
 
 - Docker
 - Docker compose
+- Python 3
+- Python Virtual Environment
 
 ## Running Apeman
 
