@@ -18,7 +18,7 @@
 ```
 git clone git@github.com:hotnops/apeman.git
 cd apeman
-sudo docker compose -f compose.yaml up
+sudo docker compose -f compose.yaml up --build
 ```
 
 ### Creating a venv
