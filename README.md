@@ -115,6 +115,17 @@ Lastly, the data needs to be analyzed
 python -m analyze.analyze
 ```
 
+### Reingesting data
+If you have updated or new JSON files, you will need to re-ingest all the data and re-analyze. To remove all data, run the following command
+```
+python -m ingest.ingest -d
+```
+After this, rerun the ingest and analyze commands:
+```
+python -m ingest.ingest -i ../path/to/gaad/directory -o ../import
+python -m analyze.analyze
+```
+
 # Using Apeman
 
 In a browser, navigate to:
