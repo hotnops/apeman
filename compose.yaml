@@ -31,8 +31,6 @@ services:
       - NEO4J_server_memory_heap_initial__size=8G
       - NEO4J_server_memory_heap_max__size=10G
       - NEO4J_server_memory_pagecache_size=4G
-    user: "${UID}:${GID}"
-    command: bash -c "chown -R ${UID}:${GID} /import && neo4j"
 
   apeman-frontend:
     build:
