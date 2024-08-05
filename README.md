@@ -14,7 +14,7 @@ sudo apt install python
 ```
 - Python Virtual Environment
 ```
-sudo apt install python3-dev
+sudo apt install python3-venv
 ```
 
 ## Running Apeman
