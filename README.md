@@ -1,3 +1,13 @@
+<p align="center">
+    <a href="https://join.slack.com/t/bloodhoundhq/shared_invite/zt-1tgq6ojd2-ixpx5nz9Wjtbhc3i8AVAWw">
+        <img src="https://img.shields.io/badge/Slack-%23apeman-blueviolet?logo=slack" alt="Slack"/></a>
+    <a href="https://twitter.com/hotnops">
+        <img src="https://img.shields.io/twitter/url?url=https%3A%2F%2Fx.com%2Fhotnops&style=social"
+        alt="@hotnops on Twitter"/></a>
+</p>
+
+---
+
 # Project Apeman
 ![Bigfoot V1](https://github.com/user-attachments/assets/451a052a-97ae-4a95-ab23-f4d3f01ec93f)
 
