@@ -19,17 +19,12 @@ sudo apt install python3-venv
 
 ## Running Apeman
 
-### Creating an import folder
-DO NOT SKIP THIS STEP. Run this as the current user
-```
-mkdir import
-```
-
 ### Starting the service
 
 ```
 git clone git@github.com:hotnops/apeman.git
 cd apeman
+mkdir import // THIS IS REALLY IMPORTANT
 sudo docker compose -f compose.yaml up --build
 ```
 
