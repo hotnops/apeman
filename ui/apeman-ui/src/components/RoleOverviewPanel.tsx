@@ -12,6 +12,7 @@ import PathAccordionList from "./PathAccordionList";
 import InlinePolicy from "./InlinePolicy";
 import RSOPPanel from "./RSOPPanel";
 import AssumeRolePolicyPanel from "./AssumeRolePolicyPanel";
+import policyService from "../services/policyService";
 
 interface Props {
   node: Node;
@@ -21,6 +22,7 @@ const RoleOverviewPanel = ({ node }: Props) => {
   const [attachedPolicies, setAttachedPolicies] = useState<Node[]>([]);
   const [inboundPaths, setInboundPaths] = useState<Path[]>([]);
   const [outboundPaths, setOutboundPaths] = useState<Path[]>([]);
+  const [inlinePolicy, setInlinePolicy] = useState<Node | null>(null);
   const { addNode, addEdge } = useApemanGraph();
 
   useEffect(() => {
@@ -86,6 +88,17 @@ const RoleOverviewPanel = ({ node }: Props) => {
 
     return cancel;
   }, [node.properties.map.roleid]);
+
+  useEffect(() => {
+    console.log("Role node: " + node);
+    const { request, cancel } = policyService.getInlinePolicyNode(node);
+
+    request?.then((res) => {
+      setInlinePolicy(res.data);
+    });
+
+    return cancel;
+  }, [node]);
 
   return (
     <>
@@ -158,8 +171,8 @@ const RoleOverviewPanel = ({ node }: Props) => {
             name="Managed Policies"
           ></AccordionList>
         </Accordion>
+        {inlinePolicy && <InlinePolicy node={inlinePolicy}></InlinePolicy>}
         <AssumeRolePolicyPanel roleNode={node} />
-        <InlinePolicy principalNode={node} />
       </Card>
       <Card>
         <RSOPPanel node={node} />

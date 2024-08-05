@@ -1451,6 +1451,61 @@ func GetPrincipalsOfPolicy(ctx context.Context, db graph.Database, policyID stri
 	return analyze.GetPrincipalsOfPolicy(ctx, db, node)
 }
 
+func GetNodesOfPolicy(ctx context.Context, db graph.Database, policyID graph.ID) (graph.PathSet, error) {
+	query := "MATCH p=(a:AWSManagedPolicy|AWSInlinePolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) WHERE ID(a) = $policyID " +
+		"WITH p, s " +
+		"MATCH p2 =(s) - [:Resource] -> () " +
+		"MATCH p3= (s) - [:Action] -> () " +
+		"OPTIONAL MATCH p4 = (s) <- [:AttachedTo] - (c:AWSCondition) <- [:AttachedTo*1..3] - () " +
+		"RETURN p, p2, p3, p4"
+
+	params := map[string]any{"policyID": policyID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	pathSet := graph.NewPathSet()
+
+	for _, result := range results {
+		var pathToStatement graph.Path
+		var statementToResource graph.Path
+		var statementToAction graph.Path
+		var statementToCondition graph.Path
+
+		err = result.Map(&pathToStatement)
+		if err != nil {
+			continue
+		}
+		pathSet.AddPath(pathToStatement)
+
+		err = result.Map(&statementToResource)
+		if err != nil {
+			continue
+		}
+
+		pathSet.AddPath(statementToResource)
+
+		err = result.Map(&statementToAction)
+		if err != nil {
+			continue
+		}
+
+		pathSet.AddPath(statementToAction)
+		err = result.Map(&statementToCondition)
+		if err != nil {
+			continue
+		}
+
+		pathSet.AddPath(statementToCondition)
+	}
+
+	return pathSet, nil
+
+}
+
 func GetPoliciesOfEntity(ctx context.Context, db graph.Database, propertyName string, id string, kind graph.Kind) (graph.NodeSet, error) {
 
 	var node *graph.Node

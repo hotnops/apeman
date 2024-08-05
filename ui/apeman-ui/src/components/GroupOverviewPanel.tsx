@@ -8,6 +8,7 @@ import PathAccordionList from "./PathAccordionList";
 
 import InlinePolicy from "./InlinePolicy";
 import groupService from "../services/groupService";
+import policyService from "../services/policyService";
 
 interface Props {
   node: Node;
@@ -87,7 +88,7 @@ const GroupOverviewPanel = ({ node }: Props) => {
             name="Attached Policies"
           ></AccordionList>
         </Accordion> */}
-        <InlinePolicy principalNode={node} />
+        <InlinePolicy node={policyService.getAsyncInlinePolicyNode(node)} />
       </Card>
     </>
   );

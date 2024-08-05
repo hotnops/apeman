@@ -28,6 +28,8 @@ Resources:
       UserName: "User3"
       Groups:
         - Ref: TestIAMGroup
+      ManagedPolicyArns:
+        - !Ref AdminLight
 
   IAMUser4:
     Type: "AWS::IAM::User"
@@ -35,6 +37,8 @@ Resources:
       UserName: "User4"
       Groups:
         - Ref: TestIAMGroup
+      ManagedPolicyArns:
+        - !Ref KindOfAdminPolicy
 
   IAMUser5:
     Type: "AWS::IAM::User"
@@ -138,6 +142,8 @@ Resources:
               - Effect: "Allow"
                 Action: "ssm:*"
                 Resource: "*"
+      ManagedPolicyArns:
+        - !Ref AdminLight
       Tags:
         - Key: "team"
           Value: "test"
@@ -288,6 +294,34 @@ Resources:
                   - arn:aws:iam::*:role/ABACRoleTest
                   - arn:aws:iam::*:role/NotActionTest
                   - arn:aws:iam::*:role/DenyTest
+
+  KindOfAdminPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "KindOfAdminPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+          - Effect: "Deny"
+            Action: "iam:PutRolePolicy"
+            Resource: "*"
+
+  AdminLight:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "AdminLight"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+          - Effect: "Deny"
+            Action: "organizations:*"
+            Resource: "*"
 
   ABACTeamSSMPolicy:
     Type: "AWS::IAM::ManagedPolicy"

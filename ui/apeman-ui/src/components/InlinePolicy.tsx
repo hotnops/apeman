@@ -5,96 +5,96 @@ import {
   AccordionItem,
   AccordionPanel,
   Box,
+  Button,
+  HStack,
   Text,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coy } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Node } from "../services/nodeService";
+import { Node, getNodeLabel } from "../services/nodeService";
 import { AsyncGetInlinePolicyJSON } from "../services/policyService";
 import nodeService from "../services/nodeService";
 import roleService from "../services/roleService";
 import userService from "../services/userService";
 import groupService from "../services/groupService";
+import { PiGraph } from "react-icons/pi";
+import { useApemanGraph } from "../hooks/useApemanGraph";
+import policyService from "../services/policyService";
+import { Path, addPathToGraph } from "../services/pathService";
 
 interface Props {
-  principalNode: Node;
+  node: Node;
 }
 
-const InlinePolicy = ({ principalNode }: Props) => {
-  const [inlinePolicies, setInlinePolicies] = useState<string[]>([]);
+const InlinePolicy = ({ node }: Props) => {
+  const [inlineStatements, setInlineStatements] = useState<string[]>([]);
+  const { addNode, addEdge } = useApemanGraph();
+
+  const graphPolicyNodes = (node: Node) => {
+    console.log(node);
+    const { request } = policyService.getNodesAttachedToPolicy(
+      node.properties.map.hash,
+      "inline"
+    );
+
+    request
+      .then((res) => {
+        console.log(res.data);
+        res.data.map((path: Path) => addPathToGraph(path, addNode, addEdge));
+      })
+      .catch((error) => {
+        if (error.code !== "ERR_CANCELED") {
+          console.error("Error fetching node permissions:", error);
+        }
+      });
+  };
 
   useEffect(() => {
-    const fetchInlinePolicies = async () => {
-      try {
-        let res;
-        if (principalNode.kinds.includes("AWSRole")) {
-          const { request } = roleService.getRoleInlinePolicyNodes(
-            principalNode.properties.map.roleid
-          );
-          res = await request;
-        } else if (principalNode.kinds.includes("AWSUser")) {
-          const { request } = userService.getUserInlinePolicyNodes(
-            principalNode.properties.map.userid
-          );
-          res = await request;
-        } else if (principalNode.kinds.includes("AWSGroup")) {
-          const { request } = groupService.getGroupInlinePolicyNodes(
-            principalNode.properties.map.groupid
-          );
-          res = await request;
-        }
+    const { request, cancel } = policyService.getInlinePolicyJSON(
+      node.properties.map.hash
+    );
 
-        const policyRequests = res?.data.nodes.map((node: Node) => {
-          const { request } = nodeService.getNodeByID(node.id.toString());
-          return request;
-        });
+    request
+      .then((res) => {
+        setInlineStatements(res.data.Statement);
+      })
+      .catch((error) => {
+        console.error("Error fetching inline policy:", error);
+      });
 
-        const responses = await Promise.all(policyRequests);
-
-        const policiesSet = new Set<string>();
-
-        await Promise.all(
-          responses.map(async (res) => {
-            const policy = await AsyncGetInlinePolicyJSON(
-              (res.data as Node).properties.map["hash"]
-            );
-            policiesSet.add(policy as string);
-          })
-        );
-
-        setInlinePolicies(Array.from(policiesSet));
-      } catch (error) {
-        console.error("Error fetching policies:", error);
-      }
+    return () => {
+      cancel();
     };
-
-    fetchInlinePolicies();
-  }, [principalNode]);
+  }, [node]);
 
   return (
-    inlinePolicies.length > 0 && (
-      <Accordion allowMultiple={true} width="100%">
-        <AccordionItem>
+    <Accordion allowMultiple={true} width="100%">
+      <AccordionItem>
+        <HStack>
           <AccordionButton>
             <Box as="span" flex="1" textAlign="left">
               <Text as="b" fontSize="sm">
-                Inline Policies
+                Inline Policy
               </Text>
             </Box>
             <AccordionIcon />
           </AccordionButton>
-          <AccordionPanel>
-            {inlinePolicies.map((policy) => (
-              <SyntaxHighlighter language="json" style={coy}>
-                {policy && JSON.stringify(policy, null, 4)}
-              </SyntaxHighlighter>
-            ))}
-          </AccordionPanel>
-        </AccordionItem>
-      </Accordion>
-    )
+          <Button onClick={() => graphPolicyNodes(node)}>
+            <PiGraph />
+          </Button>
+        </HStack>
+
+        <AccordionPanel>
+          {inlineStatements.map((policy) => (
+            <SyntaxHighlighter language="json" style={coy}>
+              {policy && JSON.stringify(policy, null, 4)}
+            </SyntaxHighlighter>
+          ))}
+        </AccordionPanel>
+      </AccordionItem>
+    </Accordion>
   );
 };
 
