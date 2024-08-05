@@ -17,6 +17,7 @@ interface Props {
 const GroupOverviewPanel = ({ node }: Props) => {
   const [membershipPaths, setMembershipPaths] = useState<Path[]>([]);
   const { addNode, addEdge } = useApemanGraph();
+  const [inlinePolicy, setInlinePolicy] = useState<Node | null>(null);
 
   useEffect(() => {
     const resp = groupService.getGroupMembershipPaths(
@@ -25,6 +26,16 @@ const GroupOverviewPanel = ({ node }: Props) => {
     resp.request.then((res) => {
       setMembershipPaths(res.data.map((path: Path) => path));
     });
+  }, [node]);
+
+  useEffect(() => {
+    const { request, cancel } = policyService.getInlinePolicyNode(node);
+
+    request?.then((res) => {
+      setInlinePolicy(res.data);
+    });
+
+    return cancel;
   }, [node]);
 
   return (
@@ -88,7 +99,7 @@ const GroupOverviewPanel = ({ node }: Props) => {
             name="Attached Policies"
           ></AccordionList>
         </Accordion> */}
-        <InlinePolicy node={policyService.getAsyncInlinePolicyNode(node)} />
+        {inlinePolicy && <InlinePolicy node={inlinePolicy} />}
       </Card>
     </>
   );

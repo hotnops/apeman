@@ -13,12 +13,7 @@ import { useEffect, useState } from "react";
 
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coy } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Node, getNodeLabel } from "../services/nodeService";
-import { AsyncGetInlinePolicyJSON } from "../services/policyService";
-import nodeService from "../services/nodeService";
-import roleService from "../services/roleService";
-import userService from "../services/userService";
-import groupService from "../services/groupService";
+import { Node } from "../services/nodeService";
 import { PiGraph } from "react-icons/pi";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import policyService from "../services/policyService";

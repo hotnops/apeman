@@ -7,7 +7,6 @@ import { Node } from "./services/nodeService";
 import { HStack, IconButton, Tab, TabList, Tabs } from "@chakra-ui/react";
 import NavBar from "./components/NavBar";
 import { useApemanGraph } from "./hooks/useApemanGraph";
-import Pathfinder from "./components/Pathfinder";
 import { IoTrashOutline } from "react-icons/io5";
 
 const Container = styled.div`
@@ -69,8 +68,7 @@ const App: React.FC = () => {
   const [panelWidth, setPanelWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const [graphNodes, setGraphNodes] = useState<{ [key: string]: Node }>({});
-  const [showPathfinder, setShowPathfinder] = useState(false);
-  const { activeElement, setNodes, setEdges } = useApemanGraph();
+  const { setNodes, setEdges } = useApemanGraph();
 
   // Handle mouse movement for resizing
   const handleMouseMove = useCallback(
@@ -133,7 +131,7 @@ const App: React.FC = () => {
           )}
           <ApemanGraphContainer>
             <HStack justifyContent="space-between">
-              <NavBar closeNavBar={() => setShowPathfinder(true)}></NavBar>
+              <NavBar></NavBar>
               <IconButton
                 aria-label="clear graph nodes"
                 icon={<IoTrashOutline />}

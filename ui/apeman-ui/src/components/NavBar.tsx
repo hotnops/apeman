@@ -1,22 +1,15 @@
-import { Box, Card, HStack, useTheme } from "@chakra-ui/react";
+import { Card, HStack } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
 import { useEffect, useRef, useState } from "react";
 import { Node } from "../services/nodeService";
 import NodeSuggestions from "./NodeSuggestions";
-import { RiDirectionLine } from "react-icons/ri";
-import HoverIcon from "./HoverIcon";
 import SearchBar from "./SearchBar";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 
-interface Props {
-  closeNavBar: () => void;
-}
-
-const NavBar = ({ closeNavBar }: Props) => {
+const NavBar = () => {
   const [searchResults, setSearchResults] = useState<Node[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const theme = useTheme();
   const [search, setSearch] = useState("");
   const handleFocusChange = (event: any) => {
     if (wrapperRef.current != null) {
@@ -57,19 +50,6 @@ const NavBar = ({ closeNavBar }: Props) => {
             setSearch={setSearch}
             setSearchResults={setSearchResults}
           ></SearchBar>
-          <Box
-            marginRight={7}
-            onClick={closeNavBar}
-            boxSize="25px"
-            flexShrink={0}
-          >
-            <HoverIcon
-              iconColor={theme.colors.gray[500]}
-              hoverColor={theme.colors.gray[900]}
-            >
-              <RiDirectionLine style={{ width: "100%", height: "100%" }} />
-            </HoverIcon>
-          </Box>
         </HStack>
         {showSuggestions && searchResults.length > 0 ? (
           <NodeSuggestions

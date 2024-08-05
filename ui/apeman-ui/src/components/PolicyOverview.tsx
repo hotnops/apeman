@@ -19,7 +19,7 @@ const PolicyOverview = ({ node }: Props) => {
   const { addNode, addEdge } = useApemanGraph();
 
   const graphPolicyNodes = (node: Node) => {
-    const { request, cancel } = PolicyService.getNodesAttachedToPolicy(
+    const { request } = PolicyService.getNodesAttachedToPolicy(
       node.properties.map.policyid,
       "managed"
     );

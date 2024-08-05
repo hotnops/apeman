@@ -75,6 +75,7 @@ interface Props {
 const ApemanGraph = ({ setGraphNodes }: Props) => {
   const graphRef = useRef<GraphCanvasRef | null>(null);
   const { nodes, edges, activeElement, setActiveElement } = useApemanGraph();
+  const divRef = useRef<HTMLDivElement>(null);
 
   var activeElementId = null;
 
@@ -96,39 +97,41 @@ const ApemanGraph = ({ setGraphNodes }: Props) => {
   };
 
   return (
-    <GraphCanvas
-      ref={graphRef}
-      nodes={nodes}
-      edges={edges}
-      glOptions={canvasOptions}
-      edgeLabelPosition="inline"
-      edgeInterpolation="linear"
-      labelType="all"
-      theme={theme}
-      layoutType="forceDirected2d"
-      selections={activeElementId ? [activeElementId.toString()] : []}
-      onCanvasClick={() => {
-        setActiveElement(null);
-      }}
-      onNodeClick={(n: InternalGraphNode) => {
-        nodeService.getNodeByID(n.id).request.then((res) => {
-          setActiveElement(res.data);
-          setGraphNodes((prevGraphNodes) => {
-            const newNodes = { ...prevGraphNodes };
-            newNodes[res.data.id] = res.data;
-            return newNodes;
-          });
-        });
-      }}
-      onEdgeClick={(e: InternalGraphEdge) => {
-        getRelationshipByID(e.id).request.then((res) => {
-          if (res.data.Properties.map.layer.toString() == "2") {
+    <div ref={divRef}>
+      <GraphCanvas
+        ref={graphRef}
+        nodes={nodes}
+        edges={edges}
+        glOptions={canvasOptions}
+        edgeLabelPosition="inline"
+        edgeInterpolation="linear"
+        labelType="all"
+        theme={theme}
+        layoutType="forceDirected2d"
+        selections={activeElementId ? [activeElementId.toString()] : []}
+        onCanvasClick={() => {
+          setActiveElement(null);
+        }}
+        onNodeClick={(n: InternalGraphNode) => {
+          nodeService.getNodeByID(n.id).request.then((res) => {
             setActiveElement(res.data);
-          }
-        });
-      }}
-      draggable
-    />
+            setGraphNodes((prevGraphNodes) => {
+              const newNodes = { ...prevGraphNodes };
+              newNodes[res.data.id] = res.data;
+              return newNodes;
+            });
+          });
+        }}
+        onEdgeClick={(e: InternalGraphEdge) => {
+          getRelationshipByID(e.id).request.then((res) => {
+            if (res.data.Properties.map.layer.toString() == "2") {
+              setActiveElement(res.data);
+            }
+          });
+        }}
+        draggable
+      />
+    </div>
   );
 };
 
