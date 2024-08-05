@@ -4,10 +4,11 @@ import ApemanGraph from "./components/ApemanGraph";
 import NodeExplorer from "./components/NodeExplorer";
 import NodeBar from "./components/NodeBar";
 import { Node } from "./services/nodeService";
-import { Tab, TabList, Tabs } from "@chakra-ui/react";
+import { HStack, IconButton, Tab, TabList, Tabs } from "@chakra-ui/react";
 import NavBar from "./components/NavBar";
 import { useApemanGraph } from "./hooks/useApemanGraph";
 import Pathfinder from "./components/Pathfinder";
+import { IoTrashOutline } from "react-icons/io5";
 
 const Container = styled.div`
   display: flex;
@@ -69,7 +70,7 @@ const App: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [graphNodes, setGraphNodes] = useState<{ [key: string]: Node }>({});
   const [showPathfinder, setShowPathfinder] = useState(false);
-  const { activeElement } = useApemanGraph();
+  const { activeElement, setNodes, setEdges } = useApemanGraph();
 
   // Handle mouse movement for resizing
   const handleMouseMove = useCallback(
@@ -131,14 +132,23 @@ const App: React.FC = () => {
             <NodeBar graphNodes={graphNodes} setGraphNodes={setGraphNodes} />
           )}
           <ApemanGraphContainer>
-            {!activeElement &&
-              (showPathfinder ? (
-                <Pathfinder
-                  onClose={() => setShowPathfinder(false)}
-                ></Pathfinder>
-              ) : (
-                <NavBar closeNavBar={() => setShowPathfinder(true)}></NavBar>
-              ))}
+            <HStack justifyContent="space-between">
+              <NavBar closeNavBar={() => setShowPathfinder(true)}></NavBar>
+              <IconButton
+                aria-label="clear graph nodes"
+                icon={<IoTrashOutline />}
+                isRound={true}
+                onClick={() => {
+                  setNodes([]);
+                  setEdges([]);
+                }}
+                size="md"
+                position="relative"
+                top="15px"
+                right="5px"
+                zIndex={1}
+              />
+            </HStack>
             <ApemanGraph setGraphNodes={setGraphNodes} />
           </ApemanGraphContainer>
         </MainContent>
