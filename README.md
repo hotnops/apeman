@@ -19,6 +19,12 @@ sudo apt install python3-venv
 
 ## Running Apeman
 
+### Creating an import folder
+DO NOT SKIP THIS STEP. Run this as the current user
+```
+mkdir import
+```
+
 ### Starting the service
 
 ```
