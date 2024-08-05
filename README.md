@@ -44,7 +44,7 @@ pip install -r requirements.txt
 The first time that you start apeman, the AWS nodes and relationships need to be added to the graph. This includes all services, actions, resource types, and condition keys. To do this, run the following command:
 
 ```
-cd utils
+// From apeman/utils
 python -m init.aws_initialize -o ../import
 ```
 
