@@ -1,5 +1,9 @@
 # Getting Started
 
+## System Requirements
+ - Debian OS (Tested on Ubuntu 24.04 LTS)
+ - 12 GB RAM (This can be reduced in the compose.yaml depending on AWS env size)
+
 ## Dependencies
 
 - Docker
