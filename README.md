@@ -1,5 +1,8 @@
-# Getting Started
+# Project Apeman
+![Bigfoot V1](https://github.com/user-attachments/assets/451a052a-97ae-4a95-ab23-f4d3f01ec93f)
 
+
+# Getting Started
 ## System Requirements
  - Debian OS (Tested on Ubuntu 24.04 LTS)
  - 12 GB RAM (This can be reduced in the compose.yaml depending on AWS env size)
