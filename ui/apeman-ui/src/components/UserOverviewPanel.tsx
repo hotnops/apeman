@@ -126,7 +126,7 @@ const UserOverviewPanel = ({ node }: Props) => {
             name="Attached Policies"
           ></AccordionList>
         </Accordion>
-        <InlinePolicy principalNode={node} />
+        <InlinePolicy node={node} />
       </Card>
       <Card>
         <RSOPPanel node={node} />

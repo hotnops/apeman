@@ -19,10 +19,10 @@ class GroupService {
       };
     }
   
-    getGroupInlinePolicyNodes(groupId: string) {
+    getGroupInlinePolicyNode(groupId: string) {
       const controller = new AbortController();
   
-      const request = apiClient.get(BASE_PATH + "/" + groupId + "/inlinepolicies", {
+      const request = apiClient.get(BASE_PATH + "/" + groupId + "/inlinepolicy", {
         signal: controller.signal,
       });
   

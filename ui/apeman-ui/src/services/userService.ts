@@ -75,10 +75,10 @@ class UserService {
     };
   }
 
-  getUserInlinePolicyNodes(userId: string) {
+  getUserInlinePolicyNode(userId: string) {
     const controller = new AbortController();
 
-    const request = apiClient.get(BASE_PATH + "/" + userId + "/inlinepolicies", {
+    const request = apiClient.get(BASE_PATH + "/" + userId + "/inlinepolicy", {
       signal: controller.signal,
     });
 

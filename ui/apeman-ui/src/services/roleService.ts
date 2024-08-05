@@ -91,10 +91,10 @@ class RoleService {
     };
   }
 
-  getRoleInlinePolicyNodes(roleid: string) {
+  getRoleInlinePolicyNode(roleid: string) {
     const controller = new AbortController();
 
-    const request = apiClient.get(BASE_PATH + "/" + roleid + "/inlinepolicies", {
+    const request = apiClient.get(BASE_PATH + "/" + roleid + "/inlinepolicy", {
       signal: controller.signal,
     });
 

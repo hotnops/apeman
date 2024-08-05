@@ -256,28 +256,45 @@ func (s *Server) GetAWSPolicyPrincipals(c *gin.Context) {
 
 }
 
+func (s *Server) GetAWSManagedPolicyNodes(c *gin.Context) {
+	propertyName := "policyid"
+	policyId := c.Param(propertyName)
+
+	policyNode, err := queries.GetAWSNodeByKindID(s.ctx, s.db, propertyName, policyId, aws.AWSManagedPolicy)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	paths, err := queries.GetNodesOfPolicy(s.ctx, s.db, policyNode.ID)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, paths)
+}
+
+func (s *Server) GetAWSInlinePolicyNodes(c *gin.Context) {
+	propertyName := "policyhash"
+	policyId := c.Param(propertyName)
+
+	policyNode, err := queries.GetAWSNodeByKindID(s.ctx, s.db, "hash", policyId, aws.AWSInlinePolicy)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	paths, err := queries.GetNodesOfPolicy(s.ctx, s.db, policyNode.ID)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	c.IndentedJSON(http.StatusOK, paths)
+}
+
 func (s *Server) GetRoleManagedPolicies(c *gin.Context) {
 	propertyName := "roleid"
 	id := c.Param(propertyName)
 
 	nodes, err := queries.GetPoliciesOfEntity(s.ctx, s.db, propertyName, id, aws.AWSManagedPolicy)
-	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
-	}
-
-	var returnValue NodeResponse
-	returnValue.Version = API_VERSION
-	returnValue.Count = len(nodes)
-	returnValue.Nodes = nodes.Slice()
-
-	c.IndentedJSON(http.StatusOK, returnValue)
-}
-
-func (s *Server) GetRoleInlinePolicies(c *gin.Context) {
-	propertyName := "roleid"
-	id := c.Param(propertyName)
-
-	nodes, err := queries.GetPoliciesOfEntity(s.ctx, s.db, propertyName, id, aws.AWSInlinePolicy)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -303,21 +320,17 @@ func (s *Server) GenerateAssumeRolePolicy(c *gin.Context) {
 
 }
 
-func (s *Server) GetUserInlinePolicies(c *gin.Context) {
-	propertyName := "userid"
-	id := c.Param(propertyName)
+func (s *Server) GetPrincipalInlinePolicy(c *gin.Context, propertyName string, id string) {
 
 	nodes, err := queries.GetPoliciesOfEntity(s.ctx, s.db, propertyName, id, aws.AWSInlinePolicy)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
+	if nodes.Len() == 0 {
+		c.IndentedJSON(http.StatusOK, nil)
+	}
 
-	var returnValue NodeResponse
-	returnValue.Version = API_VERSION
-	returnValue.Count = len(nodes)
-	returnValue.Nodes = nodes.Slice()
-
-	c.IndentedJSON(http.StatusOK, returnValue)
+	c.IndentedJSON(http.StatusOK, nodes.Slice()[0])
 }
 
 func (s *Server) GetUserManagedPolicies(c *gin.Context) {
@@ -876,12 +889,20 @@ func (s *Server) GetStatementPolicies(c *gin.Context) {
 
 }
 
+func (s *Server) GetRoleInlinePolicy(c *gin.Context) {
+	s.GetPrincipalInlinePolicy(c, "roleid", c.Param("roleid"))
+}
+
+func (s *Server) GetUserInlinePolicy(c *gin.Context) {
+	s.GetPrincipalInlinePolicy(c, "userid", c.Param("userid"))
+}
+
 func (s *Server) handleRequests() {
 	router := gin.Default()
 	router.Use(corsMiddleware())
 	router.GET("/roles/:roleid", s.GetAWSRole)
 	router.GET("/roles/:roleid/managedpolicies", s.GetRoleManagedPolicies)
-	router.GET("/roles/:roleid/inlinepolicies", s.GetRoleInlinePolicies)
+	router.GET("/roles/:roleid/inlinepolicy", s.GetRoleInlinePolicy)
 	router.GET("/roles/:roleid/generateassumerolepolicy", s.GenerateAssumeRolePolicy)
 	router.GET("/roles/:roleid/inboundroles", s.GetInboundRoles)
 	router.GET("/roles/:roleid/outboundroles", s.GetRoleOutboundRoles)
@@ -890,7 +911,7 @@ func (s *Server) handleRequests() {
 	router.GET("/roles/:roleid/rsop/actions", s.GetRoleRSOPActions)
 	router.GET("/users/:userid", s.GetAWSUser)
 	router.GET("/users/:userid/managedpolicies", s.GetUserManagedPolicies)
-	router.GET("/users/:userid/inlinepolicies", s.GetUserInlinePolicies)
+	router.GET("/users/:userid/inlinepolicy", s.GetUserInlinePolicy)
 	router.GET("/users/:userid/rsop", s.GetUserRSOP)
 	router.GET("/users/:userid/rsop/actions", s.GetUserRSOPActions)
 	router.GET("/users/:userid/outboundroles", s.GetUserOutboundRoles)
@@ -899,7 +920,9 @@ func (s *Server) handleRequests() {
 	router.GET("/managedpolicies/:policyid", s.GetAWSPolicy)
 	router.GET("/managedpolicies/:policyid/generatepolicy", s.GenerateManagedPolicy)
 	router.GET("/managedpolicies/:policyid/principals", s.GetAWSPolicyPrincipals)
+	router.GET("/managedpolicies/:policyid/nodes", s.GetAWSManagedPolicyNodes)
 	router.GET("/inlinepolicies/:policyhash/generatepolicy", s.GenerateInlinePolicy)
+	router.GET("/inlinepolicies/:policyhash/nodes", s.GetAWSInlinePolicyNodes)
 	router.GET("/groups/:groupid", s.GetAWSGroup)
 	router.GET("/groups/:groupid/members", s.GetAWSGroupMembers)
 	router.GET("/groups/:groupid/policies", s.GetGroupPolicies)
