@@ -415,6 +415,7 @@ func CreateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
 	return nil
 }
 
+// Get all paths from a principal to all resources
 func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalNode *graph.Node) (analyze.ActionPathSet, error) {
 	// First, get all resources that this principal has a path to, regardless of deny or allow
 	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSManagedPolicy|AWSInlinePolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b:UniqueArn) " +
@@ -1427,28 +1428,29 @@ func GetAWSRelationshipByGraphID(ctx context.Context, db graph.Database, id grap
 }
 
 func GetPrincipalsOfPolicy(ctx context.Context, db graph.Database, policyID string) (graph.NodeSet, error) {
-	var (
-		node *graph.Node
-		err  error
-	)
+	query := "MATCH (pol:AWSManagedPolicy {policyid: $policyID}) - [:AttachedTo] -> (prin:AWSUser|AWSRole|AWSGroup) " +
+		"RETURN prin"
 
-	err = db.ReadTransaction(ctx, func(tx graph.Transaction) error {
-		if fetchedNode, err := ops.FetchNodes(tx.Nodes().Filterf(func() graph.Criteria {
-			return query.And(
-				query.Equals(query.NodeProperty("policyid"), policyID),
-			)
-		})); err != nil {
-			return err
-		} else {
-			node = fetchedNode[0]
-			return nil
-		}
-	})
+	params := map[string]any{"policyID": policyID}
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return analyze.GetPrincipalsOfPolicy(ctx, db, node)
+	nodeSet := graph.NewNodeSet()
+
+	for _, result := range results {
+		var prinNode graph.Node
+		err = result.Map(&prinNode)
+		if err != nil {
+			continue
+		}
+		nodeSet.Add(&prinNode)
+	}
+
+	return nodeSet, nil
 }
 
 func GetNodesOfPolicy(ctx context.Context, db graph.Database, policyID graph.ID) (graph.PathSet, error) {
