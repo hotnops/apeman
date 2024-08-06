@@ -266,12 +266,13 @@ func main() {
 	for title, url := range href {
 		action_metadata, err := get_service_dict(base_url + url)
 		error_check(err)
+		actionMap = make(map[string]Actions)	
 
 		for _, items := range action_metadata {
 			actionMap[items.Action] = items
-
 		}
 		serviceMap[title] = actionMap
+		fmt.Println(serviceMap[title])
 	}
 
 	//write json file
