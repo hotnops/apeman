@@ -83,7 +83,7 @@ called "gaad"
 // cd back to the root apeman dir
 cd ../
 mkdir gaad
-touch gaad/arns.json
+touch gaad/arns.csv
 ```
 
 Next, for every account you want analyzed, perform the following action
