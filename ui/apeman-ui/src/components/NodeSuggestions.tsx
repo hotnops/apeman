@@ -23,18 +23,19 @@ const NodeSuggestions = ({ nodes, onItemSelect }: Props) => {
       width="100%"
       backgroundColor={theme.colors.white}
     >
-      {nodes.slice(0, 5).map((node) => (
+      {nodes.slice(0, 20).map((node) => (
         <ListItem
           border={10}
           _hover={{ bg: theme.colors.gray[50] }}
           cursor="pointer"
           onClick={() => onItemSelect(node)}
+          key={node.id}
         >
           <NodeListItem node={node} />
         </ListItem>
       ))}
       {truncated && (
-        <ListItem width="100%">
+        <ListItem width="100%" key={"truncated"}>
           <Text textAlign="center" fontSize="large">
             ...
           </Text>

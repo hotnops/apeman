@@ -7,6 +7,22 @@ export interface Path {
   Edges: Relationship[];
 }
 
+export interface ActionPathEntry {
+  principal_id: number;
+  principal_arn: string;
+  resource_arn: string;
+  resource_id: number;
+  action: string;
+  path: Path;
+  effect: string;
+  statement: Node;
+  conditions: Node[];
+}
+
+export interface ActionPathSet {
+  action_paths: ActionPathEntry[];
+}
+
 export interface PathResponse {
   paths: Path[];
 }
@@ -36,9 +52,17 @@ export function addPathToGraph(
   });
 
   path.Edges.map((edge) => {
-    console.log("EDGE");
-    console.log(edge);
     addEdge(edge);
+  });
+}
+
+export function addPathsToGraph(
+  paths: Path[],
+  addNode: (n: Node) => void,
+  addEdge: (e: Relationship) => void
+) {
+  paths.map((path) => {
+    addPathToGraph(path, addNode, addEdge);
   });
 }
 
@@ -79,7 +103,28 @@ export function GetNodeIdentityPath(startNodeId: number, endNodeId: number) {
 export function GetNodePermissionPath(startNodeId: number, endNodeId: number) {
   const controller = new AbortController();
   const request = apiClient.get(
-    `/node/${startNodeId}/permissionpath/${endNodeId}`,
+    `/permissionpath/${startNodeId}/${endNodeId}`,
+    {
+      signal: controller.signal,
+    }
+  );
+
+  return {
+    request,
+    cancel: () => {
+      controller.abort();
+    },
+  };
+}
+
+export function GetNodePermissionPathWithAction(
+  startNodeId: number,
+  destNodeId: number,
+  action: string
+) {
+  const controller = new AbortController();
+  const request = apiClient.get<Path[]>(
+    `/permissionpath/${startNodeId}/${destNodeId}?action=${action}`,
     {
       signal: controller.signal,
     }

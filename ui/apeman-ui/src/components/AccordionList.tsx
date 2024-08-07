@@ -31,7 +31,7 @@ const AccordionList = ({ nodes, name, pathFunction }: Props) => {
     <AccordionItem width="100%">
       <HStack width="100%" justifyContent="left">
         <AccordionButton width="100%" justifyContent="space-between">
-          <Text width="80%" textAlign="left">
+          <Text width="80%" textAlign="left" as="b" fontSize="sm">
             {name}
           </Text>
           <Text width="10%">{nodes.length}</Text>
@@ -55,7 +55,7 @@ const AccordionList = ({ nodes, name, pathFunction }: Props) => {
             {nodes.map((node) => (
               <Tr key={node.id}>
                 <Td textOverflow="ellipsis" width="80%">
-                  {getNodeLabel(node)}
+                  <Text fontSize="xs">{getNodeLabel(node)}</Text>
                 </Td>
 
                 {pathFunction && (

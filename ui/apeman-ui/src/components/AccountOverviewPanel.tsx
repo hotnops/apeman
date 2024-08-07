@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import nodeService, { Node, kinds } from "../services/nodeService";
 import { Accordion } from "@chakra-ui/react";
 import AccordionList from "./AccordionList";
-import DirectTierZeroList from "./DirectTierZeroList";
 import IndirectTierZeroList from "./IndirectTierZeroList";
 
 interface Props {
@@ -70,9 +69,6 @@ const AccountOverviewPanel = ({ node }: Props) => {
       <AccordionList name="Policies" nodes={policies}></AccordionList>
       <AccordionList name="Users" nodes={users}></AccordionList>
       <AccordionList name="Groups" nodes={groups}></AccordionList>
-      <DirectTierZeroList
-        account_id={node.properties.map.account_id}
-      ></DirectTierZeroList>
       <IndirectTierZeroList
         account_id={node.properties.map.account_id}
       ></IndirectTierZeroList>

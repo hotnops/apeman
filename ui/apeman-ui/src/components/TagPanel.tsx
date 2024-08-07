@@ -1,42 +1,71 @@
-import { Table, TableContainer, Td, Tr } from "@chakra-ui/react";
+import {
+  Table,
+  TableContainer,
+  Td,
+  Tr,
+  Text,
+  Thead,
+  Th,
+  Tbody,
+} from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import nodeService, { Node } from "../services/nodeService";
-import { useApemanGraph } from "../hooks/useApemanGraph";
 
-const TagPanel = () => {
+interface Props {
+  node: Node;
+}
+
+const TagPanel = ({ node }: Props) => {
   const [tagNodes, setTagNodes] = useState<Node[]>([]);
 
-  const { activeElement: activeNode } = useApemanGraph();
   useEffect(() => {
-    if (activeNode == null) {
-      return;
-    }
-    const { request, cancel } = nodeService.getNodeTags(
-      (activeNode as Node).id.toString()
-    );
-    request.then((res) => {
-      const nodes: Node[] = res.data;
-      nodes.map((node) => {
-        setTagNodes((prev) => [...prev, node]);
+    let isMounted = true;
+
+    const { request, cancel } = nodeService.getNodeTags(node.id.toString());
+
+    request
+      .then((res) => {
+        if (isMounted) {
+          setTagNodes(res.data);
+        }
+      })
+      .catch((error) => {
+        if (error.code !== "ERR_CANCELED") {
+          console.error("Error fetching node tags:", error);
+        }
       });
-    });
-    return cancel;
-  }, []);
+
+    return () => {
+      isMounted = false;
+      cancel();
+    };
+  }, [node.id]);
+
   return (
     <>
-      {tagNodes && (
+      {tagNodes.length > 0 && (
         <TableContainer>
           <Table variant="striped">
-            {tagNodes.map((tagNode) => (
+            <Thead>
               <Tr>
-                <Td key={tagNode.properties.map.key}>
-                  {tagNode.properties.map.key}
-                </Td>
-                <Td key={tagNode.properties.map.value}>
-                  {tagNode.properties.map.value}
-                </Td>
+                <Th>
+                  <Text as="b">Key</Text>
+                </Th>
+                <Th>
+                  <Text as="b">Value</Text>
+                </Th>
               </Tr>
-            ))}
+            </Thead>
+            <Tbody>
+              {tagNodes.map((tagNode) => (
+                <Tr key={tagNode.id}>
+                  <Td>
+                    <Text>{tagNode.properties.map.key}</Text>
+                  </Td>
+                  <Td>{tagNode.properties.map.value}</Td>
+                </Tr>
+              ))}
+            </Tbody>
           </Table>
         </TableContainer>
       )}

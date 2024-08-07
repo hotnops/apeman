@@ -9,6 +9,7 @@ import {
   Tbody,
   Td,
   Text,
+  Tooltip,
   Tr,
 } from "@chakra-ui/react";
 
@@ -33,14 +34,15 @@ const AccordionList = ({
   }
   return (
     <AccordionItem width="100%">
-      <HStack width="100%" justifyContent="left">
-        <AccordionButton width="100%" justifyContent="space-between">
-          <Text width="80%" textAlign="left">
+      <HStack width="100%">
+        <AccordionButton width="100%">
+          <Text width="80%" fontSize="sm" textAlign="left" as="b">
             {name}
           </Text>
           <Text width="10%">{paths.length}</Text>
           <AccordionIcon width="10%"></AccordionIcon>
         </AccordionButton>
+
         <Button
           onClick={() => {
             paths.map((path) => {
@@ -54,12 +56,21 @@ const AccordionList = ({
         </Button>
       </HStack>
       <AccordionPanel>
-        <Table overflowX="scroll">
+        <Table overflowX="scroll" size="sm">
           <Tbody>
             {paths.map((path) => (
-              <Tr>
-                <Td textOverflow="ellipsis" width="80%">
-                  {pathLabelFunction(path)}
+              <Tr key={paths.indexOf(path)}>
+                <Td maxWidth={"20vw"}>
+                  <Tooltip label={pathLabelFunction(path)} hasArrow>
+                    <Text
+                      fontSize="xs"
+                      textOverflow="ellipsis"
+                      whiteSpace="nowrap"
+                      overflow="hidden"
+                    >
+                      {pathLabelFunction(path)}
+                    </Text>
+                  </Tooltip>
                 </Td>
 
                 {pathFunction && (

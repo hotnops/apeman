@@ -15,6 +15,7 @@ from neo4j import GraphDatabase
 import arn
 
 condition_map = {}
+condition_key_map = {}
 condition_value_map = {}
 statements_map = {}
 permission_documents_map = {}
@@ -28,15 +29,15 @@ group_map = {}
 action_blob_map = {}
 resource_blob_map = {}
 tag_map = {}
+identity_provider_map = {}
+principal_blob_map = {}
 
 hash_to_hash_rels = {}
 hash_to_arn_rels = {}
 arn_to_arn_rels = {}
 member_of_rels = {}
-condition_key_to_condition_rels = {}
 operator_to_condition_rels = {}
 multi_operator_to_condition_rels = {}
-condition_value_to_condition_rels = {}
 statement_to_action_rels = {}
 statement_to_not_action_rels = {}
 statement_to_resource_rels = {}
@@ -45,7 +46,11 @@ statement_to_resource_blob_rels = {}
 statement_to_not_resource_blob_rels = {}
 statement_to_action_blob_rels = {}
 statement_to_not_action_blob_rels = {}
+statement_to_principal_rels = {}
+statement_to_principal_blob_rels = {}
+statement_to_uniquename_rels = {}
 condition_key_to_resource_rels = {}
+condition_value_to_key_rels = {}
 
 def get_hash(item_to_hash: dict):
     return xxhash.xxh128_hexdigest(json.dumps(item_to_hash, sort_keys=True))
@@ -83,42 +88,26 @@ def process_tags(principal):
 
 
 def process_condition(operator: str, condition_keyvalue: dict):
-    condition_dict = {
-        "operator": operator,
-    }
-    for key, value in condition_keyvalue.items():
-        condition_dict["condition_key"] = key.lower()
-        condition_dict["condition_value"] = value
-
-    condition_hash = get_hash(condition_dict)
+    condition_hash = get_hash({operator: condition_keyvalue})
+    # {Operator: {ConditionKey: [ConditionValue]}}
 
     if condition_hash not in condition_map:
-        condition_dict['hash'] = condition_hash
-        condition_map[condition_hash] = condition_dict
-
-    # Map the operator to the condition
-    if operator.startswith("foranyvalue") or\
-            operator.startswith("forallvalues"):
-        multi_operator, operator = operator.split(":", 1)
-        add_to_rels(multi_operator_to_condition_rels, multi_operator,
-                    condition_hash)
+        condition_map[condition_hash] = {"hash": condition_hash, 'sid': condition_keyvalue.get('sid', "")}
 
     add_to_rels(operator_to_condition_rels, operator, condition_hash)
-    #Map the condition key to the condition
+    
     for condition_key, condition_values in condition_keyvalue.items():
-        condition_key = condition_key.lower()
-        add_to_rels(condition_key_to_condition_rels, condition_key,
-                    condition_hash)
-        if not type(condition_values) == list:
-            condition_values = [condition_values]
+        condition_key_hash = get_hash({condition_key: condition_values})
+        if condition_key_hash not in condition_key_map:
+            condition_key_map[condition_key_hash] = {'hash': condition_key_hash, 'name': condition_key}
+    
+        add_to_rels(hash_to_hash_rels, condition_key_hash, condition_hash)
 
+        if type(condition_values) != list:
+            condition_values = [condition_values]
         for condition_value in condition_values:
-            if not condition_value:
-                condition_value = "empty"
             process_condition_value(condition_value)
-            # Condition value to condition
-            add_to_rels(condition_value_to_condition_rels, condition_value,
-                        condition_hash)
+            add_to_rels(condition_value_to_key_rels, condition_value, condition_key_hash)
 
     return condition_hash
 
@@ -152,21 +141,83 @@ def replace_policy_var_with_wildcard(input_string: str):
     
     return result
 
+def isAccountNumber(value: str):
+    if len(value) == 12 and value.isdigit():
+        return True
+    return False
+
+def process_principals(statement_hash, principals: dict, negated: bool):
+    
+
+    awsPrins = principals.get("AWS", [])
+    services = principals.get("Service", [])
+    federated = principals.get("Federated", [])
+    canonical_user = principals.get("CanonicalUser", [])
+
+    if awsPrins:
+        if not type(awsPrins) == list:
+            awsPrins = [awsPrins]
+        for principal in awsPrins:
+            if principal == "*":
+                if "*" not in principal_blob_map:
+                    principal_blob_map["*"] = {"name": "*", "regex": neo4j_escape_regex("*")}
+                add_to_rels(statement_to_principal_blob_rels, statement_hash, "*")
+            if arn.Arn.is_arn(principal):
+                prinArn = arn.Arn.fromstring(principal)
+                if principal.endswith(":root"):
+                    name = principal.replace("root", "*")
+                    if name not in principal_blob_map:
+                        principal_blob_map[name] = {"name": name, "regex": neo4j_escape_regex(name)}
+                    add_to_rels(statement_to_principal_blob_rels, statement_hash, name)
+                else:
+                    if statement_hash not in statement_to_principal_rels:
+                        statement_to_principal_rels[statement_hash] = set([])
+                    statement_to_principal_rels[statement_hash].add(principal)
+
+            elif isAccountNumber(principal):
+                name = f"arn:aws:iam::{principal}:*"
+                if name not in principal_blob_map:
+                    principal_blob_map[name] = {"name": name, "regex": neo4j_escape_regex(name)}
+                add_to_rels(statement_to_principal_blob_rels, statement_hash, name)
+            else:
+                print(f"[*] Invalid principal: {principal}")
+            
+    
+    if services:
+        if not type(services) == list:
+            services = [services]
+        for service in services:
+            if statement_hash not in statement_to_uniquename_rels:
+                statement_to_uniquename_rels[statement_hash] = set([])
+            statement_to_uniquename_rels[statement_hash].add(service)
+
+    
+    if federated:
+        if not type(federated) == list:
+            federated = [federated]
+        for federated_principal in federated:
+            if federated_principal not in identity_provider_map:
+                identity_provider_map[federated_principal] = {'name': federated_principal}
+
+            if statement_hash not in statement_to_uniquename_rels:
+                statement_to_uniquename_rels[statement_hash] = set([])
+            statement_to_uniquename_rels[statement_hash].add(federated_principal)
+
+    if canonical_user:
+        print("[*] Canonical user not implemented")
+
+
 def process_resources(statement_hash, resources: list, negated: bool):
     for resource in resources:
         regex = None
-        is_root = False
         policy_var = False        
 
 
         if arn.Arn.is_arn(resource):
             resource_arn = arn.Arn.fromstring(resource)
-            if resource_arn.service == "iam" and resource_arn.resource == "root":
-                is_root = True
-                regex = f"arn:aws:iam::{resource_arn.account_id}:(user|group|role)/[^:]+"
             policy_var = has_policy_variable(resource)
 
-        if "*" in resource or is_root or policy_var:
+        if "*" in resource or policy_var:
             if resource not in resource_blob_map:
                 if policy_var:
                     vars = extract_policy_variables(resource)
@@ -272,14 +323,13 @@ def process_statement(statement):
     process_resources(statement_hash, notResources, True)
     
     # # This is for statements in trust policies
-    principals = statement.get('Principal', {}).get("AWS", [])
-    # notPrincipals = statement.get('NotPrincipal', {}).get("AWS", [])
-    if not type(principals) == list:
-        principals = [principals]
-    # if not type(notPrincipals) == list:
-    #     notPrincipals = [notPrincipals]
-    process_resources(statement_hash, principals, False)
-    # process_resources(statement_hash, notPrincipals, True)
+    principals = statement.get('Principal', {})
+    # See: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#principal-anonymous
+    # If the principal is *, it means that the principal is anonymous and equivalent to
+    # "AWS": ""
+    if principals == "*":
+        principals = {"AWS": "*"}
+    process_principals(statement_hash, principals, False)
 
     return statement_hash
 
@@ -513,7 +563,7 @@ def ingest_csv(session, filename, datatype, fields):
         query += f"a.{field} = {field}, "
     query += "a.layer = 1 "
     try:
-        session.run(query)
+        return session.run(query)
     except Exception as e:
         print(e)
         import pdb; pdb.set_trace()
@@ -561,6 +611,8 @@ def load_csvs_into_database():
                    ["hash", "version", "sid"])
         ingest_csv(session, "conditions.csv", "AWSCondition:UniqueHash",
                    ["hash", "sid"])
+        ingest_csv(session, "conditionkeys.csv", "AWSConditionKey:UniqueHash",
+                   ["hash", "name"])
         ingest_csv(session, "conditionvalues.csv", "AWSConditionValue:UniqueName",
                    ["name"])
         ingest_csv(session, "groups.csv", "AWSGroup:UniqueArn",
@@ -574,7 +626,7 @@ def load_csvs_into_database():
         # is one that gets its own ARN. To fit with the naming scheme,
         # we are keeping AWSManagedPolicy
         ingest_csv(session, "managedpolicies.csv", "AWSManagedPolicy:UniqueArn",
-                   ["policyname", "policyid", "arn", "path",
+                   ["arn", "policyname", "policyid", "path",
                     "defaultversionid", "attachmentcount",
                     "permissionsboundaryusagecount",
                     "isattachable", "createdate", "updatedate"])
@@ -594,6 +646,10 @@ def load_csvs_into_database():
                    ['name', 'regex'])
         ingest_csv(session, "tags.csv", "AWSTag:UniqueHash",
                    ['hash', 'key', 'value'])
+        ingest_csv(session, "identityproviders.csv", "AWSIdentityProvider:UniqueName",
+                   ['name'])
+        ingest_csv(session, "principalblobs.csv", "AWSPrincipalBlob:UniqueName", ['name', 'regex'])
+
         ingest_relationships(session, "hash_to_hash_rels.csv", "UniqueHash",
                              "hash", "AttachedTo", "UniqueHash", "hash")
         ingest_relationships(session, "hash_to_arn_rels.csv", "UniqueHash",
@@ -602,14 +658,6 @@ def load_csvs_into_database():
                              "arn", "AttachedTo", "UniqueArn", "arn")
         ingest_relationships(session, "member_of_rels.csv", "AWSUser", "arn",
                              "MemberOf", "AWSGroup", "arn")
-        ingest_relationships(session, "condition_key_to_condition_rels.csv",
-                             "AWSConditionKey:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
-        ingest_relationships(session, "condition_value_to_condition_rels.csv",
-                             "AWSConditionValue:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSCondition:UniqueHash", "hash")
         ingest_relationships(session, "operator_to_condition_rels.csv",
                              "AWSOperator:UniqueName", "name",
                              "AttachedTo",
@@ -650,10 +698,24 @@ def load_csvs_into_database():
                              "AWSStatement:UniqueHash", "hash",
                              "NotResource",
                              "AWSResourceBlob:UniqueName", "name")
-        ingest_relationships(session, "condition_key_to_resource_rels.csv",
-                             "AWSConditionKey:UniqueName", "name",
-                             "AttachedTo",
-                             "AWSResourceBlob:UniqueName", "name")
+        
+        ingest_relationships(session, "statement_to_principal_arn.csv",
+                                "AWSStatement:UniqueHash", "hash",
+                                "Principal",
+                                "UniqueArn", "arn")
+        ingest_relationships(session, "statement_to_principal_uniquename.csv",
+                                "AWSStatement:UniqueHash", "hash",
+                                "Principal",
+                                "UniqueName", "name")
+        ingest_relationships(session, "statement_to_principal_blob_rels.csv",
+                                "AWSStatement:UniqueHash", "hash",
+                                "Principal",
+                                "AWSPrincipalBlob:UniqueName", "name")
+        
+        ingest_relationships(session, "condition_value_to_condition_keys_rels.csv",
+                                "AWSConditionValue:UniqueName", "name",
+                                "AttachedTo",
+                                "AWSConditionKey:UniqueHash", "hash")
                              
         try:
             ingest_resources(session, "arns.csv")
@@ -678,9 +740,6 @@ def write_rels_to_csv(outputdir):
     hash_to_arn_filename = os.path.join(outputdir, "hash_to_arn_rels.csv")
     arn_to_arn_rels_filename = os.path.join(outputdir, "arn_to_arn_rels.csv")
     member_of_rels_filename = os.path.join(outputdir, "member_of_rels.csv")
-    ck_to_condition_rels_filename = os.path.join(
-        outputdir,
-        "condition_key_to_condition_rels.csv")
 
     operator_to_condition_rels_filename = os.path.join(
         outputdir,
@@ -689,9 +748,9 @@ def write_rels_to_csv(outputdir):
         output_dir,
         "multi_operator_to_condition_rels.csv"
     )
-    condition_value_to_condition_rels_filename = os.path.join(
+    condition_value_to_condition_key_rels_filename = os.path.join(
         outputdir,
-        "condition_value_to_condition_rels.csv"
+        "condition_value_to_condition_keys_rels.csv"
     )
     statement_to_action_rels_filename = os.path.join(
         outputdir,
@@ -733,6 +792,26 @@ def write_rels_to_csv(outputdir):
         "condition_key_to_resource_rels.csv"
     )
 
+    statement_to_principal_arn_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_principal_arn.csv"
+    )
+
+    statement_to_principal_name_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_principal_uniquename.csv"
+    )
+
+    statement_to_principal_blob_rels_filename = os.path.join(
+        outputdir,
+        "statement_to_principal_blob_rels.csv"
+    )
+
+    condition_value_to_condition_key_rels_filename = os.path.join(
+        outputdir,
+        "condition_value_to_condition_keys_rels.csv"
+    )
+
     write_to_csv(hash_to_hash_filename,
                  rels_to_unique_list(hash_to_hash_rels), fields)
     write_to_csv(hash_to_arn_filename,
@@ -741,17 +820,12 @@ def write_rels_to_csv(outputdir):
                  rels_to_unique_list(arn_to_arn_rels), fields)
     write_to_csv(member_of_rels_filename,
                  rels_to_unique_list(member_of_rels), fields)
-    write_to_csv(ck_to_condition_rels_filename,
-                 rels_to_unique_list(condition_key_to_condition_rels),
-                 fields)
+
     write_to_csv(operator_to_condition_rels_filename,
                  rels_to_unique_list(operator_to_condition_rels),
                  fields)
     write_to_csv(multi_operator_to_condition_rels_filename,
                  rels_to_unique_list(multi_operator_to_condition_rels),
-                 fields)
-    write_to_csv(condition_value_to_condition_rels_filename,
-                 rels_to_unique_list(condition_value_to_condition_rels),
                  fields)
     write_to_csv(statement_to_action_rels_filename,
                  rels_to_unique_list(statement_to_action_rels),
@@ -780,6 +854,21 @@ def write_rels_to_csv(outputdir):
     write_to_csv(condition_key_to_resource_rels_filename,
                  rels_to_unique_list(condition_key_to_resource_rels),
                  fields)
+    
+    write_to_csv(statement_to_principal_arn_rels_filename,
+                    rels_to_unique_list(statement_to_principal_rels),
+                    fields)
+    write_to_csv(statement_to_principal_name_rels_filename,
+                    rels_to_unique_list(statement_to_uniquename_rels),
+                    fields)
+    
+    write_to_csv(statement_to_principal_blob_rels_filename,
+                    rels_to_unique_list(statement_to_principal_blob_rels),
+                    fields)
+    
+    write_to_csv(condition_value_to_condition_key_rels_filename,
+                    rels_to_unique_list(condition_value_to_key_rels),
+                    fields)
 
 
 def delete_layer_1():
@@ -813,7 +902,7 @@ def write_nodes_to_csv(output_dir: str):
     managed_policies_filename = os.path.join(output_dir,
                                              "managedpolicies.csv")
 
-    managed_policies_field_names = ["policyname", "policyid", "arn", "path",
+    managed_policies_field_names = ["arn", "policyname", "policyid", "path",
                                     "defaultversionid", "attachmentcount",
                                     "permissionsboundaryusagecount",
                                     "isattachable", "createdate",
@@ -849,6 +938,10 @@ def write_nodes_to_csv(output_dir: str):
     condition_fields = ['hash', 'sid']
     write_to_csv(conditions_filename, condition_map, condition_fields)
 
+    condition_key_filename = os.path.join(output_dir, "conditionkeys.csv")
+    condition_key_fields = ['hash', 'name']
+    write_to_csv(condition_key_filename, condition_key_map, condition_key_fields)
+
     condition_value_filename = os.path.join(output_dir, "conditionvalues.csv")
     write_to_csv(condition_value_filename, condition_value_map, ['name'])
     groups_filename = os.path.join(output_dir, "groups.csv")
@@ -876,6 +969,12 @@ def write_nodes_to_csv(output_dir: str):
     tags_filename = os.path.join(output_dir, "tags.csv")
     write_to_csv(tags_filename, tag_map, ["hash", "key", "value"])
 
+    idp_filename = os.path.join(output_dir, "identityproviders.csv")
+    write_to_csv(idp_filename, identity_provider_map, ["name"])
+
+    principal_blob_filename = os.path.join(output_dir, "principalblobs.csv")
+    write_to_csv(principal_blob_filename, principal_blob_map, ["name", "regex"])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -898,7 +997,7 @@ if __name__ == "__main__":
     for root, dirs, files in os.walk(input_dir):
         for filename in files:
             if filename.endswith('.json'):
-                with open(os.path.join(input_dir, filename), 'r') as f:
+                with open(os.path.join(root, filename), 'r') as f:
                     text = f.read()
                     parse_json(text)
         write_nodes_to_csv(output_dir)
