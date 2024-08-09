@@ -194,10 +194,6 @@ Resources:
               - Effect: "Deny"
                 Action: "ssm:GetParameter"
                 Resource: !Sub "arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/artifactory_key"
-        - PolicyName: "SSMAdmin"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
               - Effect: "Allow"
                 Action: "ssm:*"
                 Resource: "*"
