@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import arn
 
 from io import StringIO
+import concurrent.futures
 import json
 import multiprocessing
 import neo4j
@@ -11,6 +12,7 @@ import pandas as pd
 import re
 import requests
 import shutil
+import threading
 import time
 
 from neo4j import GraphDatabase
@@ -126,6 +128,7 @@ def get_service_dict(ret_data, link):
         service_dict['ResourceTypes'] = resources_json
         service_dict['ConditionKeys'] = condition_json
         ret_data[service_name] = service_dict
+        return ret_data
 
     except requests.RequestException as e:
         print(f"Failed to fetch content from {link}. Reason: {e}")
@@ -133,17 +136,16 @@ def get_service_dict(ret_data, link):
 
 def get_all_services_html(data):
     all_hrefs = extract_hrefs(data)
-    manager = multiprocessing.Manager()
-    ret_data = manager.dict()
-    jobs = []
-    for link in all_hrefs:
-        p = multiprocessing.Process(target=get_service_dict,
-                                    args=(ret_data, link))
-        jobs.append(p)
-        p.start()
+    ret_data = {}
+    lock = threading.Lock()
 
-    for proc in jobs:
-        proc.join()
+    def thread_task(link):
+        result = get_service_dict({}, link)
+        with lock:
+            ret_data.update(result)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
+        executor.map(thread_task, all_hrefs)
 
     return ret_data.copy()
 
