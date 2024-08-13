@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // PolicyEditorConfig represents the top-level JSON structure
@@ -78,23 +80,6 @@ func get_service_metadata(url string) (*PolicyEditorConfig, error) {
 		error_check(err)
 	}
 
-	// Print the parsed data
-
-	/*
-		fmt.Println("Condition Operators:", config.ConditionOperators)
-		fmt.Println("Condition Keys:", config.ConditionKeys)
-
-
-			for service, details := range config.ServiceMap {
-
-				fmt.Println("Service:", service)
-				fmt.Println("  String Prefix:", details.StringPrefix)
-				fmt.Println("  Actions:", details.Actions)
-				fmt.Println("  ARN Format:", details.ARNFormat)
-				fmt.Println("  ARN Regex:", details.ARNRegex)
-				fmt.Println("  Has Resource:", details.HasResource)
-			}
-	*/
 	return &config, nil
 }
 
@@ -204,8 +189,19 @@ func get_service_dict(link string) ([]Actions, error) {
 	return details, nil
 }
 
-func aws_initialize() {
-	// save for later
+func aws_initialize(ctx context.Context, output_directory string) {
+
+	dbUri :=  "bolt://localhost:7687"
+
+
+	driver, err := neo4j.NewDriverWithContext(
+		dbUri,
+		neo4j.NoAuth())
+
+	error_check(err)
+
+defer driver.Close(ctx)
+
 }
 
 func write_data_to_csv(filename string, data []string) {
@@ -241,9 +237,15 @@ func error_check(err error) {
 }
 
 func main() {
+	//urls that will be used to grab services, policies, and actions
 	service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
 	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
 	service_json_url := base_url + "toc-contents.json"
+	
+	//context for neo4j database
+	ctx := context.Background()
+	
+	output_directory, err := os.Getwd()
 
 	services_metadata, err := get_service_metadata(service_url)
 	error_check(err)
@@ -290,5 +292,8 @@ func main() {
 	aws_scheme_filewriter.Write(json_output)
 
 	fmt.Println("[*] Data written to awsschema.json")
+
+	//initialize database
+	aws_initialize(ctx,output_directory)
 
 }
