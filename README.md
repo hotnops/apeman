@@ -89,7 +89,7 @@ touch gaad/arns.csv
 Next, for every account you want analyzed, perform the following action
 
 ```
-aws iam get-account-authorization-details > gaad/<account_number>.json
+aws iam get-account-authorization-details --output json > gaad/<account_number>.json
 ```
 Optionally, you can obtain a list of all the ARNs in the account. This may help produce more accurate results
 ```
