@@ -1,11 +1,4 @@
-import React from "react";
-import { Node } from "../services/nodeService";
-
-interface Props {
-  node: Node;
-}
-
-const ActionOverviewPanel = ({ node }: Props) => {
+const ActionOverviewPanel = () => {
   return <div>ActionOverviewPanel</div>;
 };
 
