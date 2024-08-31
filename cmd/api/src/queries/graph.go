@@ -20,6 +20,14 @@ type PermissionMapping struct {
 	Actions map[string][]graph.ID `json:"actions"`
 }
 
+func GetInboundRolePaths(ctx context.Context, db graph.Database, roleId string) (graph.PathSet, error) {
+	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform* {name: 'sts:assumerole'}] -> (b:AWSRole) WHERE b.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
+	query = fmt.Sprintf(query, roleId)
+	paths, err := CypherQueryPaths(ctx, db, query)
+
+	return paths, err
+}
+
 func RawCypherQuery(ctx context.Context, db graph.Database, query string, paramaters map[string]any) ([]graph.ValueMapper, error) {
 	var values []graph.ValueMapper
 	if err := db.ReadTransaction(ctx, func(tx graph.Transaction) error {
