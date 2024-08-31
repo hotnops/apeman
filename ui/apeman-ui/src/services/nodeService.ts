@@ -18,6 +18,12 @@ export interface Node {
   properties: Properties;
 }
 
+export interface NodeResponse {
+  version: string
+  count: number
+  nodes: Node[]
+}
+
 export enum kinds {
   AWSAccount = "AWSAccount",
   AWSRole = "AWSRole",
@@ -66,9 +72,9 @@ export function getIconURL(nodeKinds: string[]): string {
   if (nodeKinds.includes(kinds.AWSPolicyDocument)) {
     return icon_dir + "policy_document_icon.svg";
   }
-  // if (nodeKinds.includes(kinds.AWSStatement)) {
-  //   return icon_dir + "statement_icon.svg";
-  // }
+  if (nodeKinds.includes(kinds.AWSStatement)) {
+    return icon_dir + "statement_icon.svg";
+  }
   if (nodeKinds.includes(kinds.AWSAssumeRolePolicy)) {
     return icon_dir + "assume_role_policy_icon.svg";
   }
@@ -145,8 +151,6 @@ export function getNodeLabel(node: Node): string {
 
 function getNodeFill(node: Node) {
   if (node.kinds.includes(kinds.AWSStatement)) {
-    console.log("Statement node");
-    console.log(node);
     if (node.properties.map.effect == "Allow") {
       return "#76d654";
     } else {
@@ -300,6 +304,20 @@ class NodeService {
 
     const request = apiClient.get(path);
 
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
+
+  getNodeByArn(arn: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get<Node[]>(NODE_BASE + "?arn=" + arn, {
+      signal: controller.signal,
+    });
     return {
       request,
       cancel: () => {

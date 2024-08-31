@@ -1,5 +1,5 @@
 import { Node } from "../services/nodeService";
-import { Table, Tbody, Td, Tr, Text } from "@chakra-ui/react";
+import { Table, Tbody, Td, Tr, Text, Card } from "@chakra-ui/react";
 import TagPanel from "./TagPanel";
 
 interface Props {
@@ -9,26 +9,40 @@ interface Props {
 const NodeOverview = ({ node }: Props) => {
   return (
     <>
-      <Table>
-        <Tbody>
-          {Object.keys(node.properties.map).map((key) => (
-            <Tr>
-              <Td>{key}</Td>
-              <Td>{node.properties.map[key]}</Td>
+      <Card marginY="20px">
+        <Table size="sm" variant="simple">
+          <Tbody>
+            {Object.keys(node.properties.map).map((key) => (
+              <Tr key={key}>
+                <Td>
+                  <b>{key}</b>
+                </Td>
+                <Td textAlign="right">{node.properties.map[key]}</Td>
+              </Tr>
+            ))}
+            <Tr key="kinds">
+              <Td>
+                <b>kinds</b>
+              </Td>
+              <Td textAlign="right">
+                {node.kinds.map((kind, index) => (
+                  <p key={index}>{kind}</p>
+                ))}
+              </Td>
             </Tr>
-          ))}
-          <Tr>
-            <Td>Kinds</Td>
-            <Td>
-              {node.kinds.map((kind) => (
-                <p>{kind}</p>
-              ))}
-            </Td>
-          </Tr>
-        </Tbody>
-      </Table>
-      <Text fontSize="xl">Tags</Text>
-      <TagPanel></TagPanel>
+            <Tr key="node-id">
+              <Td>
+                <b>node id</b>
+              </Td>
+              <Td textAlign="right">{node.id}</Td>
+            </Tr>
+          </Tbody>
+        </Table>
+      </Card>
+      <Text fontSize="lg" as="b">
+        Tags
+      </Text>
+      <TagPanel node={node}></TagPanel>
     </>
   );
 };

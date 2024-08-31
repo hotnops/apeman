@@ -2,16 +2,15 @@ import {
   Card,
   HStack,
   useTheme,
-  IconButton,
   Tabs,
   TabList,
   Tab,
   TabPanel,
   TabPanels,
+  IconButton,
 } from "@chakra-ui/react";
 import { Node } from "../services/nodeService";
 import { useEffect, useRef, useState } from "react";
-import { IoClose } from "react-icons/io5";
 import { useApemanGraph } from "../hooks/useApemanGraph";
 import {
   GetNodePermissionPath,
@@ -24,6 +23,7 @@ import { FaUser } from "react-icons/fa";
 import { MdChecklist } from "react-icons/md";
 import { FaArrowsAltH } from "react-icons/fa";
 import PermissionPathFinder from "./PermissionPathFinder";
+import { IoClose } from "react-icons/io5";
 
 interface Props {
   onClose: () => void;
@@ -36,13 +36,6 @@ const Pathfinder = ({ onClose }: Props) => {
   const { addNode, addEdge } = useApemanGraph();
   const theme = useTheme();
 
-  //   useEffect(() => {
-  //     document.addEventListener("mousedown", handleFocusChange);
-  //     return () => {
-  //       document.removeEventListener("mousedown", handleFocusChange);
-  //     };
-  //   });
-
   useEffect(() => {
     if (pathNodes.length < 2) {
       return;
@@ -54,7 +47,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -67,7 +59,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -80,7 +71,6 @@ const Pathfinder = ({ onClose }: Props) => {
         pathNodes[1].id
       );
       request.then((response) => {
-        console.log(response.data);
         response.data.map((path: Path) =>
           addPathToGraph(path, addNode, addEdge)
         );
@@ -93,7 +83,7 @@ const Pathfinder = ({ onClose }: Props) => {
   return (
     <div ref={wrapperRef}>
       <Card
-        position="fixed"
+        position="relative"
         top="15px"
         left="10px"
         width="30em"

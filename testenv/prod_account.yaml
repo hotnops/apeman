@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Prod account
+
+Parameters:
+  DevAccountId:
+    Type: String
+    Description: The account ID of the dev account.
+
+Resources:
+  ArtifactoryProdRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "ArtifactoryProdRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${DevAccountId}:root"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ArtifactoryProdPolicy
+      Policies:
+        - PolicyName: "ArtifactoryProdPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "s3:GetObject"
+                Resource: "*"
+      Tags:
+        - Key: "team"
+          Value: "dev"
+
+  ArtifactoryProdPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      PolicyName: "ArtifactoryProdPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "s3:GetObject"
+            Resource: "*"

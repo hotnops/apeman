@@ -1,9 +1,36 @@
+<p align="center">
+    <a href="https://join.slack.com/t/bloodhoundhq/shared_invite/zt-1tgq6ojd2-ixpx5nz9Wjtbhc3i8AVAWw">
+        <img src="https://img.shields.io/badge/Slack-%23apeman-blueviolet?logo=slack" alt="Slack"/></a>
+    <a href="https://twitter.com/hotnops">
+        <img src="https://img.shields.io/twitter/url?url=https%3A%2F%2Fx.com%2Fhotnops&style=social"
+        alt="@hotnops on Twitter"/></a>
+</p>
+
+---
+
+# Project Apeman
+![Bigfoot V1](https://github.com/user-attachments/assets/451a052a-97ae-4a95-ab23-f4d3f01ec93f)
+
+
 # Getting Started
+## System Requirements
+ - Tested On
+    - Windows 11
+    - Ubuntu 22
+ - 12 GB RAM (This can be reduced in the compose.yaml depending on AWS env size)
 
 ## Dependencies
 
 - Docker
 - Docker compose
+- Python 3
+```
+sudo apt install python
+```
+- Python Virtual Environment
+```
+sudo apt install python3-venv
+```
 
 ## Running Apeman
 
@@ -12,7 +39,8 @@
 ```
 git clone git@github.com:hotnops/apeman.git
 cd apeman
-sudo docker compose -f compose.yaml up
+mkdir import // THIS IS REALLY IMPORTANT
+sudo docker compose -f compose.yaml up --build
 ```
 
 ### Creating a venv
@@ -28,10 +56,10 @@ pip install -r requirements.txt
 
 ### Initializing the AWS schema
 
-The first time that you start apeman, the AWS nodes and relationships need to be added to the graph. This includes all services, actions, resource types, and condition keys. To do this, run the following command:
+The first time that you start apeman, the AWS nodes and relationships need to be added to the graph. This includes all services, actions, resource types, and condition keys. THIS ONLY NEEDS TO BE RUN ONCE! If AWS updates a service or adds an action, then you will need to re-run this command to honor the new changes. To do this, run the following command:
 
 ```
-cd utils
+// From apeman/utils
 python -m init.aws_initialize -o ../import
 ```
 
@@ -55,13 +83,16 @@ called "gaad"
 // cd back to the root apeman dir
 cd ../
 mkdir gaad
-touch gaad/arns.json
+touch gaad/arns.csv
 ```
 
 Next, for every account you want analyzed, perform the following action
 
 ```
-aws iam get-account-authorization-details > gaad/<account_number>.json
+aws iam get-account-authorization-details --output json > gaad/<account_number>.json
+```
+Optionally, you can obtain a list of all the ARNs in the account. This may help produce more accurate results and is meant to supplement the account authorization details
+```
 aws resource-explorer-2 search --query-string "*" | jq -r '.Resources[] | [.Arn] | @csv' >> import/arns.csv
 ```
 
@@ -96,6 +127,17 @@ If ingest is successful, you will get an output like this:
 Lastly, the data needs to be analyzed
 
 ```
+python -m analyze.analyze
+```
+
+### Reingesting data
+If you have updated or new JSON files, you will need to re-ingest all the data and re-analyze. To remove all data, run the following command
+```
+python -m ingest.ingest -d
+```
+After this, rerun the ingest and analyze commands:
+```
+python -m ingest.ingest -i ../path/to/gaad/directory -o ../import
 python -m analyze.analyze
 ```
 

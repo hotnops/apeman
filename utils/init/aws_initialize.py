@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import arn
 
 from io import StringIO
+import concurrent.futures
 import json
 import multiprocessing
 import neo4j
@@ -11,6 +12,7 @@ import pandas as pd
 import re
 import requests
 import shutil
+import threading
 import time
 
 from neo4j import GraphDatabase
@@ -126,6 +128,7 @@ def get_service_dict(ret_data, link):
         service_dict['ResourceTypes'] = resources_json
         service_dict['ConditionKeys'] = condition_json
         ret_data[service_name] = service_dict
+        return ret_data
 
     except requests.RequestException as e:
         print(f"Failed to fetch content from {link}. Reason: {e}")
@@ -133,17 +136,16 @@ def get_service_dict(ret_data, link):
 
 def get_all_services_html(data):
     all_hrefs = extract_hrefs(data)
-    manager = multiprocessing.Manager()
-    ret_data = manager.dict()
-    jobs = []
-    for link in all_hrefs:
-        p = multiprocessing.Process(target=get_service_dict,
-                                    args=(ret_data, link))
-        jobs.append(p)
-        p.start()
+    ret_data = {}
+    lock = threading.Lock()
 
-    for proc in jobs:
-        proc.join()
+    def thread_task(link):
+        result = get_service_dict({}, link)
+        with lock:
+            ret_data.update(result)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
+        executor.map(thread_task, all_hrefs)
 
     return ret_data.copy()
 
@@ -184,10 +186,15 @@ def convert_regex_to_wildcard(arn):
 
 
 def write_data_to_csv(actions: dict, actions_file, resources_file,
-                      condition_keys_file, action_to_resources_types_rels_file):
+                      condition_keys_file, services_file, action_to_resources_types_rels_file):
     actions_file.write("name,access_level\n")
     resources_file.write("name,arn\n")
     action_to_resources_types_rels_file.write("source,dest\n")
+    for service_name in actions.keys():
+        service_prefix = get_service_prefix(service_name)
+        service_url = f"{service_prefix}.amazonaws.com"
+        services_file.write(f"{service_name},{service_prefix},{service_url}\n".lower())
+
     for service_name, definition in actions.items():
         service_prefix = get_service_prefix(service_name)
         lines = []
@@ -283,6 +290,8 @@ def load_csvs_into_database(driver):
                    ["name"])
         ingest_csv(session, "awsactions.csv", "AWSAction:UniqueName",
                    ["name", "access_level"])
+        ingest_csv(session, "awsservices.csv", "AWSService:UniqueName",
+                   ["name", "prefix", "url"])
         ingest_relationships(session, "actions_to_resourcetypes_rels.csv", "AWSAction:UniqueName",
                              "name", "ActsOn", "AWSResourceType:UniqueName", "name")
 
@@ -403,14 +412,15 @@ def aws_initialize(output_dir, schema_path=None):
     resources_filename = os.path.join(output_dir, "awsresourcetypes.csv")
     ck_filename = os.path.join(output_dir, "awsconditionkeys.csv")
     rt_rels_filename = os.path.join(output_dir, "actions_to_resourcetypes_rels.csv")
+    services_file = os.path.join(output_dir, "awsservices.csv")
 
     with open(
             actions_filename, 'w') as actions_file, open(
             resources_filename, 'w') as resources_file, open(
-            ck_filename, 'w') as ck_file, open(
+            ck_filename, 'w') as ck_file, open(services_file, 'w') as services_file, open(
                 rt_rels_filename, 'w') as action_to_rt_rels_file:
         write_data_to_csv(aws_schema, actions_file, resources_file,
-                          ck_file, action_to_rt_rels_file)
+                          ck_file, services_file, action_to_rt_rels_file)
 
     # These files are manually maintained
     shutil.copy(os.path.join(MODULE_DIR, "awsoperators.csv"),

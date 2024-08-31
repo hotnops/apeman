@@ -5,3 +5,7 @@ utils/service_metadata.json
 utils/venv/
 graph_data/
 import/
+node_modules/
+gaad/
+go-mod-cache/
+cmd/api/main

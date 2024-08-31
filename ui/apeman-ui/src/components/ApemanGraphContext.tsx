@@ -34,7 +34,6 @@ export const ApemanGraphProvider = ({ children }: { children: ReactNode }) => {
     const graphNode = nodeToGraphNode(node);
     const index = nodes.findIndex((item) => item.id === graphNode.id);
     if (index === -1) {
-      console.log(graphNode);
       setNodes((prevNodes) => [...prevNodes, graphNode]);
     }
   };

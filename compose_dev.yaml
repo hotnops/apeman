@@ -24,13 +24,13 @@ services:
     environment:
       - NEO4JLABS_PLUGINS=["apoc"]
       - NEO4J_AUTH=none
-      - NEO4J_server_memory_heap_initial__size=8G
-      - NEO4J_server_memory_heap_max__size=10G
+      - NEO4J_server_memory_heap_initial__size=6G
+      - NEO4J_server_memory_heap_max__size=8G
       - NEO4J_server_memory_pagecache_size=4G
 
   apeman-frontend:
     image: node:20-alpine
-    command: sh -c "yarn install && yarn vite"
+    command: sh -c "npm i --force && npm run dev"
     volumes:
       - ./ui/apeman-ui:/app
     working_dir: /app
@@ -38,7 +38,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
     labels:
       - traefik.enable=true
-      - traefik.http.routers.apeman-frontend.rule=Host(`apeman-frontend.localhost`)
+      - traefik.http.routers.apeman-frontend.rule=Host(`apeman.localhost`)
       - traefik.http.routers.apeman-frontend.service=apeman-frontend
       - traefik.http.services.apeman-frontend.loadbalancer.server.port=5173
 
@@ -46,8 +46,14 @@ services:
     build:
       context: ./cmd
       dockerfile: Dockerfile_dev
+    command: >
+      /bin/sh -c "
+      go build -gcflags='all=-N -l' -o ./api/main ./api/main.go
+      && dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./api/main"
+
     volumes:
       - ./go-mod-cache:/go/pkg/mod
+      - ./cmd:/src
     image: apeman-backend-dev
     ports:
       - "2345:2345"

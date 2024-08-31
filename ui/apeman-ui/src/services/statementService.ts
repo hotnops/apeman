@@ -1,3 +1,4 @@
+import apiClient from "./api-client";
 import nodeService, { Node } from "./nodeService";
 import {
   GetRelationshipNodes,
@@ -11,6 +12,8 @@ export interface StatementDetails {
   resources: Node[];
   conditions: Node[];
 }
+
+const BASE_PATH = "/statements"
 
 export async function fetchAllStatementData(
   node: Node,
@@ -51,3 +54,39 @@ export async function fetchAllStatementData(
     // Handle the error appropriately
   }
 }
+
+class StatementService {
+  getAttachedPolicies(statementHash: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get(BASE_PATH + "/" + statementHash + "/attachedpolicies", {
+      signal: controller.signal
+    })
+
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
+
+  getStatementObject(statementHash: string) {
+    const controller = new AbortController();
+
+    const request = apiClient.get(BASE_PATH + "/" + statementHash + "/generatestatement", {
+      signal: controller.signal
+    })
+
+    return {
+      request,
+      cancel: () => {
+        controller.abort();
+      },
+    };
+  }
+
+
+}
+
+export default new StatementService();

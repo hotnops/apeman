@@ -32,7 +32,6 @@ services:
       - NEO4J_server_memory_heap_max__size=10G
       - NEO4J_server_memory_pagecache_size=4G
 
-
   apeman-frontend:
     build:
       context: ui/apeman-ui
@@ -40,7 +39,7 @@ services:
     image: apeman-frontend
     labels:
       - traefik.enable=true
-      - traefik.http.routers.apeman-frontend.rule=Host(`apeman-frontend.localhost`)
+      - traefik.http.routers.apeman-frontend.rule=Host(`apeman.localhost`)
       - traefik.http.routers.apeman-frontend.service=apeman-frontend
       - traefik.http.services.apeman-frontend.loadbalancer.server.port=80
 
