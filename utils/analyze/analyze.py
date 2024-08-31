@@ -121,7 +121,7 @@ def analyze_assume_roles():
         print("[*] Assume role analysis complete")
     else:
         print("[!] Could not analyze assume roles")
-        import pdb; pdb.set_trace()
+        print(resp)
 
 def analyze():
     driver = GraphDatabase.driver("bolt://localhost:7687",
