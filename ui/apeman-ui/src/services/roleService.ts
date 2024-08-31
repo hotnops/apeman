@@ -34,7 +34,7 @@ export function GetOutboundRoles(roleId: string) {
 
 export function GetInboundPaths(roleId: string) {
   const controller = new AbortController();
-  const request = apiClient.get(`/roles/${roleId}/inboundpaths`, {
+  const request = apiClient.get(`/roles/${roleId}/inboundroles`, {
     signal: controller.signal,
   });
 

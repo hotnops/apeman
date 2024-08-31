@@ -31,19 +31,27 @@ import nodeService, {
 import resourceService from "../services/resourceService";
 import {
   GetNodePermissionPathWithAction,
+  Path,
   addPathToGraph,
 } from "../services/pathService";
 import { useApemanGraph } from "../hooks/useApemanGraph";
+import { GetInboundPaths } from "../services/roleService";
+import React from "react";
 
 interface Props {
   node: Node;
+}
+
+interface PermissionPath {
+  node: Node;
+  via: Node[];
 }
 
 const ResourceOverview = ({ node }: Props) => {
   const [actions, setActions] = useState<string[]>([]);
   const [principals, setPrincipals] = useState<Node[]>([]);
   const [actionPanelData, setActionPanelData] = useState<{
-    [action: string]: Node[];
+    [action: string]: PermissionPath[];
   }>({});
   const [principalPanelData, setPrincipalPanelData] = useState<{
     [principalArn: string]: string[];
@@ -93,8 +101,39 @@ const ResourceOverview = ({ node }: Props) => {
           .then((res) => {
             setActionPanelData((prev) => ({
               ...prev,
-              [action]: res.data,
+              [action]: res.data.map((prinNode: Node) => ({
+                node: prinNode,
+                via: [],
+              })),
             }));
+            res.data.map((prinNode: Node) => {
+              if (prinNode.kinds.includes("AWSRole")) {
+                const roleId = prinNode.properties.map["roleid"];
+                const { request, cancel } = GetInboundPaths(roleId);
+
+                request
+                  .then((res) => {
+                    res.data.forEach((path: Path) => {
+                      console.log("Inbound path: ", path);
+                      const pathNodes = path.Nodes.slice(1); // Get all nodes except the last
+                      const lastNode = path.Nodes[0]; // Get the last node
+
+                      setActionPanelData((prev) => ({
+                        ...prev,
+                        [action]: [
+                          ...(prev[action] || []), // Preserve existing data for this action
+                          { node: lastNode, via: pathNodes },
+                        ],
+                      }));
+                    });
+                  })
+                  .catch((error) => {
+                    console.error("Error fetching paths:", error);
+                  });
+
+                return cancel;
+              }
+            });
           })
           .catch((error) => {
             if (error.code !== "ERR_CANCELED") {
@@ -231,12 +270,12 @@ const ResourceOverview = ({ node }: Props) => {
                       <TableContainer>
                         <Table>
                           <Tbody>
-                            {actionPanelData[action].map((prinNode) => (
-                              <Tr key={prinNode.id}>
+                            {actionPanelData[action].map((permPath) => (
+                              <Tr key={permPath.node.id}>
                                 <Td width="10px">
                                   <Box boxSize="10px">
                                     <img
-                                      src={getIconURL(prinNode.kinds)}
+                                      src={getIconURL(permPath.node.kinds)}
                                       alt="icon"
                                       width="10px"
                                     />
@@ -244,17 +283,31 @@ const ResourceOverview = ({ node }: Props) => {
                                 </Td>
                                 <Td>
                                   <Tooltip
-                                    label={getNodeLabel(prinNode)}
+                                    label={getNodeLabel(permPath.node)}
                                     hasArrow
                                   >
                                     <Text
                                       fontSize="xs"
                                       maxWidth="200px"
                                       whiteSpace="nowrap"
-                                      overflow="hidden"
-                                      textOverflow="ellipsis"
+                                      //overflow="hidden"
+                                      //textOverflow="ellipsis"
                                     >
-                                      {getNodeLabel(prinNode)}
+                                      {getNodeLabel(permPath.node)}
+                                      {permPath.via.length > 0 && (
+                                        <>
+                                          {" "}
+                                          <b>via</b>
+                                          <br />
+                                          {permPath.via.map((node, index) => (
+                                            <React.Fragment key={index}>
+                                              {getNodeLabel(node)}
+                                              {index <
+                                                permPath.via.length - 1 && ", "}
+                                            </React.Fragment>
+                                          ))}
+                                        </>
+                                      )}
                                     </Text>
                                   </Tooltip>
                                 </Td>
@@ -264,7 +317,7 @@ const ResourceOverview = ({ node }: Props) => {
                                     icon={<PiGraph />}
                                     onClick={() =>
                                       handlePrincipalToResourceWithActionPathClick(
-                                        prinNode.id,
+                                        permPath.node.id,
                                         node.id,
                                         action
                                       )
