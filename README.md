@@ -50,7 +50,7 @@ A python virtual environment is recommended to ingest the data
 ```
 cd utils
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate [For Windows:  .\venv\Scripts\activate]
 pip install -r requirements.txt
 ```
 
