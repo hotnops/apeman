@@ -22,7 +22,7 @@
     "@neo4j/graphql": "^5.0.1",
     "@react-sigma/core": "^3.4.2",
     "@types/react-router": "^5.1.20",
-    "axios": "^1.6.7",
+    "axios": "^1.7.4",
     "force-graph": "^1.43.4",
     "framer-motion": "^11.0.3",
     "graphology": "^0.25.4",
