@@ -26,3 +26,25 @@ jobs:
       - name: Run TypeScript compiler with noEmit
         run: npx tsc --noEmit --strict
         working-directory: ./ui/apeman-ui
+
+  go-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.20" # Replace with the Go version you want to use
+
+      - name: Download Go modules
+        run: go mod download
+        working-directory: ./cmd
+
+      - name: Build Go binary
+        run: go build -ldflags '-s -w' -o main ./api/main.go
+        working-directory: ./cmd
+
+      - name: Verify Go binary
+        run: ./cmd/main --version
