@@ -2,7 +2,7 @@ beautifulsoup4==4.12.3
 bs4==0.0.2
 certifi==2024.2.2
 charset-normalizer==3.3.2
-idna==3.6
+idna==3.7
 lxml==5.1.0
 neo4j==5.18.0
 numpy==1.26.4
