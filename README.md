@@ -9,25 +9,30 @@
 ---
 
 # Project Apeman
+
 ![Bigfoot V1](https://github.com/user-attachments/assets/451a052a-97ae-4a95-ab23-f4d3f01ec93f)
 
-
 # Getting Started
+
 ## System Requirements
- - Tested On
-    - Windows 11
-    - Ubuntu 22
- - 12 GB RAM (This can be reduced in the compose.yaml depending on AWS env size)
+
+- Tested On
+  - Windows 11
+  - Ubuntu 22
+- 12 GB RAM (This can be reduced in the compose.yaml depending on AWS env size)
 
 ## Dependencies
 
 - Docker
 - Docker compose
 - Python 3
+
 ```
 sudo apt install python
 ```
+
 - Python Virtual Environment
+
 ```
 sudo apt install python3-venv
 ```
@@ -40,7 +45,7 @@ sudo apt install python3-venv
 git clone git@github.com:hotnops/apeman.git
 cd apeman
 mkdir import // THIS IS REALLY IMPORTANT
-sudo docker compose -f compose.yaml up --build
+sudo docker compose -f compose.yaml up
 ```
 
 ### Creating a venv
@@ -91,7 +96,9 @@ Next, for every account you want analyzed, perform the following action
 ```
 aws iam get-account-authorization-details --output json > gaad/<account_number>.json
 ```
+
 Optionally, you can obtain a list of all the ARNs in the account. This may help produce more accurate results and is meant to supplement the account authorization details
+
 ```
 aws resource-explorer-2 search --query-string "*" | jq -r '.Resources[] | [.Arn] | @csv' >> import/arns.csv
 ```
@@ -131,11 +138,15 @@ python -m analyze.analyze
 ```
 
 ### Reingesting data
+
 If you have updated or new JSON files, you will need to re-ingest all the data and re-analyze. To remove all data, run the following command
+
 ```
 python -m ingest.ingest -d
 ```
+
 After this, rerun the ingest and analyze commands:
+
 ```
 python -m ingest.ingest -i ../path/to/gaad/directory -o ../import
 python -m analyze.analyze
