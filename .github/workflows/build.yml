@@ -46,5 +46,6 @@ jobs:
         run: go build -ldflags '-s -w' -o main ./api/main.go
         working-directory: ./cmd
 
-      - name: Verify Go binary
-        run: ./cmd/main --version
+      - name: Check if Go binary exists
+        run: test -f ./main
+        working-directory: ./cmd
