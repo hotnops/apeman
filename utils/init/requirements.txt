@@ -20,6 +20,6 @@ requests==2.32.2
 six==1.16.0
 soupsieve==2.5
 tzdata==2023.3
-urllib3==2.0.3
+urllib3==2.2.2
 xxhash==3.3.0
 yarg==0.1.9
