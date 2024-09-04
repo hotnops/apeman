@@ -28,7 +28,7 @@ func (s *Server) GetAWSNodeByGraphID(c *gin.Context) {
 	propertyName := "nodeid"
 	idString := c.Param(propertyName)
 
-	id, err := strconv.Atoi(idString)
+	id, err := strconv.ParseUint(idString, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -47,7 +47,7 @@ func (s *Server) GetAWSNodeEdges(c *gin.Context, direction graph.Direction) {
 	idString := c.Param(propertyName)
 	queryParams := c.Request.URL.Query()
 
-	id, err := strconv.Atoi(idString)
+	id, err := strconv.ParseUint(idString, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -67,7 +67,7 @@ func (s *Server) GetAWSNodeEdges(c *gin.Context, direction graph.Direction) {
 
 func (s *Server) GetAWSNodeTags(c *gin.Context) {
 	nodeIdStr := c.Param("nodeid")
-	nodeId, err := strconv.Atoi(nodeIdStr)
+	nodeId, err := strconv.ParseUint(nodeIdStr, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -84,11 +84,11 @@ func (s *Server) GetNodeIdentityPath(c *gin.Context) {
 	sourceNodeIdStr := c.Param("nodeid")
 	destNodeIdStr := c.Param("destnodeid")
 
-	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
+	sourceNodeId, err := strconv.ParseUint(sourceNodeIdStr, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
-	destNodeId, err := strconv.Atoi(destNodeIdStr)
+	destNodeId, err := strconv.ParseInt(destNodeIdStr, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -106,11 +106,11 @@ func (s *Server) GetNodeShortestPath(c *gin.Context) {
 	sourceNodeIdStr := c.Param("nodeid")
 	destNodeIdStr := c.Param("destnodeid")
 
-	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
+	sourceNodeId, err := strconv.ParseUint(sourceNodeIdStr, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
-	destNodeId, err := strconv.Atoi(destNodeIdStr)
+	destNodeId, err := strconv.ParseUint(destNodeIdStr, 10, 64)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
