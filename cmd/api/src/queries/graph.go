@@ -92,39 +92,6 @@ func Search(ctx context.Context, db graph.Database, searchString string) (graph.
 	return nodes, nil
 }
 
-func GetActiveAWSConditionKeys(ctx context.Context, db graph.Database) (graph.NodeSet, error) {
-	// Active condition keys are the ones currently being used which means they are
-	// attached to a condition
-	var (
-		nodes = graph.NewNodeSet()
-	)
-
-	err := db.ReadTransaction(ctx, func(tx graph.Transaction) error {
-		if rels, err := ops.FetchRelationships(tx.Relationships().Filterf(func() graph.Criteria {
-			return query.And(
-				query.Kind(query.Start(), aws.AWSConditionKey),
-				query.Kind(query.Relationship(), aws.AttachedTo),
-				query.Kind(query.End(), aws.AWSCondition),
-			)
-		})); err != nil {
-			return err
-		} else {
-			for _, rel := range rels {
-				node, err := ops.FetchNode(tx, rel.StartID)
-				if err != nil {
-					return err
-				}
-				nodes.Add(node)
-			}
-			return nil
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	return nodes, nil
-}
-
 func GetAWSAccountIDs(ctx context.Context, db graph.Database) ([]string, error) {
 	var accountIDs []string
 	query := "MATCH (a:UniqueArn) RETURN DISTINCT a.account_id"
@@ -327,6 +294,50 @@ func CreateIdentityTransformEdge(ctx context.Context, db graph.Database, sourceN
 	})
 }
 
+func GetNodePermissionPath(ctx context.Context, db graph.Database, sourdeNodeID graph.ID, destNodeID graph.ID, actionName string) ([]graph.Path, error) {
+	// First, get all paths to target resource
+	// TODO: This doesn't account for group memberships!!
+	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSInlinePolicy|AWSManagedPolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) " +
+		"WHERE ID(a) = $sourceNodeId AND ID(b) = $destNodeId " +
+		"WITH s, p " +
+		"MATCH p2=(s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) " +
+		"RETURN p, p2"
+
+	params := map[string]any{
+		"sourceNodeId": sourdeNodeID,
+		"destNodeId":   destNodeID,
+		"actionName":   actionName,
+	}
+
+	log.Print(query)
+
+	results, err := RawCypherQuery(ctx, db, query, params)
+	if err != nil {
+		return nil, err
+	}
+
+	paths := []graph.Path{}
+
+	for _, result := range results {
+		var resourcePath graph.Path
+		var actionPath graph.Path
+		err = result.Map(&resourcePath)
+		if err != nil {
+			continue
+		}
+		paths = append(paths, resourcePath)
+		err = result.Map(&actionPath)
+		if err != nil {
+			continue
+		}
+		paths = append(paths, actionPath)
+
+	}
+
+	return paths, nil
+
+}
+
 func CreateAssumeRoleEdgesToRole(ctx context.Context, db graph.Database, roleNode *graph.Node, counter *Counter) {
 	roleId, _ := roleNode.Properties.Get(string(aws.RoleId)).String()
 	roleArn, _ := roleNode.Properties.Get("arn").String()
@@ -495,50 +506,6 @@ func GetUnresolvedOutputPaths(ctx context.Context, db graph.Database, principalN
 	}
 
 	return actionPathSet, nil
-
-}
-
-func GetNodePermissionPath(ctx context.Context, db graph.Database, sourdeNodeID graph.ID, destNodeID graph.ID, actionName string) ([]graph.Path, error) {
-	// First, get all paths to target resource
-	// TODO: This doesn't account for group memberships!!
-	query := "MATCH p=(a:AWSUser|AWSRole) <- [:AttachedTo] - (:AWSInlinePolicy|AWSManagedPolicy) <- [:AttachedTo*2..3] - (s:AWSStatement) - [:Resource|ExpandsTo*1..2] -> (b) " +
-		"WHERE ID(a) = $sourceNodeId AND ID(b) = $destNodeId " +
-		"WITH s, p " +
-		"MATCH p2=(s) - [:Action|ExpandsTo*1..2] -> (act:AWSAction {name: $actionName}) " +
-		"RETURN p, p2"
-
-	params := map[string]any{
-		"sourceNodeId": sourdeNodeID,
-		"destNodeId":   destNodeID,
-		"actionName":   actionName,
-	}
-
-	log.Print(query)
-
-	results, err := RawCypherQuery(ctx, db, query, params)
-	if err != nil {
-		return nil, err
-	}
-
-	paths := []graph.Path{}
-
-	for _, result := range results {
-		var resourcePath graph.Path
-		var actionPath graph.Path
-		err = result.Map(&resourcePath)
-		if err != nil {
-			continue
-		}
-		paths = append(paths, resourcePath)
-		err = result.Map(&actionPath)
-		if err != nil {
-			continue
-		}
-		paths = append(paths, actionPath)
-
-	}
-
-	return paths, nil
 
 }
 

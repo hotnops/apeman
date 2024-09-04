@@ -47,7 +47,7 @@ export enum kinds {
   UniqueName = "UniqueName",
 }
 
-const NODE_BASE = "/node";
+const NODE_BASE = "/nodes";
 
 export function getIconURL(nodeKinds: string[]): string {
   const icon_dir = "./";
