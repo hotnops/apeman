@@ -28,7 +28,7 @@ func (s *Server) GetAWSNodeByGraphID(c *gin.Context) {
 	propertyName := "nodeid"
 	idString := c.Param(propertyName)
 
-	id, err := strconv.ParseUint(idString, 10, 64)
+	id, err := strconv.ParseUint(idString, 10, 32)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
@@ -47,7 +47,7 @@ func (s *Server) GetAWSNodeEdges(c *gin.Context, direction graph.Direction) {
 	idString := c.Param(propertyName)
 	queryParams := c.Request.URL.Query()
 
-	id, err := strconv.ParseUint(idString, 10, 64)
+	id, err := strconv.ParseUint(idString, 10, 32)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
