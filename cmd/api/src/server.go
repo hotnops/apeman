@@ -139,11 +139,11 @@ func (s *Server) GetNodePermissionPath(c *gin.Context) {
 	queryParams := c.Request.URL.Query()
 	action := queryParams.Get("action")
 
-	sourceNodeId, err := strconv.Atoi(sourceNodeIdStr)
+	sourceNodeId, err := strconv.ParseUint(sourceNodeIdStr, 10, 32)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
-	destNodeId, err := strconv.Atoi(destNodeIdStr)
+	destNodeId, err := strconv.ParseInt(destNodeIdStr, 10, 32)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
