@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -301,6 +302,17 @@ func error_check(err error) {
 }
 
 func main() {
+
+	//take in command line arguments
+	var output_directory string
+	var input_schema string
+
+	flag.StringVar(&output_directory, "-o", "../import/", "The directory to output csv files. This will default to import directory.")
+	flag.StringVar(&output_directory, "--o", "../import/", "The directory to output csv files. This will default to import directory.")
+
+	flag.StringVar(&input_schema, "-i", "", "The AWS input schema")
+	flag.StringVar(&input_schema, "--input-schema", "", "The AWS input schema")
+
 	/*
 		//urls that will be used to grab services, policies, and actions
 		service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
