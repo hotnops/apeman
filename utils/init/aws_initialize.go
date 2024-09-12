@@ -234,39 +234,110 @@ func ingest_relationships(ctx context.Context, driver neo4j.DriverWithContext, f
 		"MERGE (s) - [:" + rel_name + "  {{layer: 0}}] -> (d) " +
 		"} IN TRANSACTIONS"
 
-	//executeQuery(context, driver, query, params, resultTransformer)
-	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+	neo4j.ExecuteQuery(ctx, driver, query,
 		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
+	//executeQuery(context, driver, query, params, resultTransformer)
+	/*
 
-	error_check(err)
 
-	fmt.Println("[+] Added: ", result.Summary)
+
+		error_check(err)
+
+		fmt.Println("[+] Added: ", result.Summary)
+	*/
 }
 
 func create_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, label string, property string) {
 	query := "CREATE CONSTRAINT  " + constraint_name + " IF NOT EXISTS FOR (n: " + label + ") REQUIRE n." + property + " IS UNIQUE"
 
-	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+	neo4j.ExecuteQuery(ctx, driver, query,
 		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
-	error_check(err)
-
-	fmt.Println("[+] Added: ", result.Summary)
 }
 
 func create_relationship_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, rel_name string, unique_property_name string) {
 	query := "CREATE CONSTRAINT " + constraint_name + " IF NOT EXISTS " +
 		"FOR () - [r:" + rel_name + "] -() REQUIRE (r." + unique_property_name + " IS UNIQUE"
 
-	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+	neo4j.ExecuteQuery(ctx, driver, query,
 		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
-	error_check(err)
+}
+func create_constraints_in_neo4j(ctx context.Context, driver neo4j.DriverWithContext) {
 
-	fmt.Println("[+] Added: ", result.Summary)
+	create_constraint(ctx, driver, "awsactionconstraint", "AWSAction", "name")
+	create_constraint(ctx,driver, "actionblobconstraint", "AWSActionBlob", "name")
+	create_constraint(ctx, driver, "assumerolepolicyconstraint","AWSAssumeRolePolicy", "hash")
+    create_constraint(ctx, driver, , "conditionconstraint","AWSCondition", "hash")
+    create_constraint(ctx, driver, "conditionvalueconstraint","AWSConditionValue", "name")
+    create_constraint(ctx, driver, "groupconstraint","AWSGroup", "arn")
+    create_constraint(ctx, driver, "inlinepolicyconstraint","AWSInlinePolicy", "hash")
+    create_constraint(ctx, driver, "managedpolicyconstraint","AWSManagedPolicy", "arn")
+    create_constraint(ctx, driver, "policydocumentconstraint","AWSPolicyDocument", "hash")
+    create_constraint(ctx, driver, "policyversionconstraint","AWSPolicyVersion", "hash")
+    create_constraint(ctx, driver, "roleconstraint","AWSRole", "arn")
+    create_constraint(ctx, driver, "statementconstraint","AWSStatement", "hash")
+    create_constraint(ctx, driver, "userconstraint","AWSUser", "arn")
+    create_constraint(ctx, driver, "resourceblobconstraint","AWSResourceBlob", "name")
+    create_constraint(ctx, driver, "tagconstraint","AWSTag", "hash")
+    create_constraint(ctx, driver, "uniquehashconstraint", "UniqueHash", "hash")
+
+
+}
+func create_indices(ctx context.Context, driver neo4j.DriverWithContext) {
+	var query string
+
+	query = "CREATE TEXT INDEX uniquehash IF NOT EXISTS " +
+		"FOR (n:UniqueHash) ON (n.hash)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX uniquearn IF NOT EXISTS " +
+		"FOR (n:UniqueArn) ON (n.arn)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX uniquename IF NOT EXISTS " +
+		"FOR (n:UniqueName) ON (n.name)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX statementeffect IF NOT EXISTS " +
+		"FOR (s:AWSStatement) ON (s.effect)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX actionname IF NOT EXISTS " +
+		"FOR (s:AWSAction) ON (s.name)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX actionblobname IF NOT EXISTS " +
+		"FOR (s:AWSActionBlob) ON (s.name)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	query = "CREATE TEXT INDEX rolebname IF NOT EXISTS " +
+		"FOR (s:AWSResource) ON (s.name)"
+
+	neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
 }
 
 func write_data_to_csv(filename string, data []string) {
@@ -319,6 +390,7 @@ func main() {
 		base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
 		service_json_url := base_url + "toc-contents.json"
 	*/
+
 	//context for neo4j database
 	ctx := context.Background()
 	//initialize database
