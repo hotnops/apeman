@@ -21,11 +21,11 @@
       "program": "${workspaceFolder}/cmd/api/main.go"
     },
     {
-      "name": "Launch",
+      "name": "Launch Golang",
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/utils/init/aws_initialize.go",
+      "program": "${file}",
       "env": {},
       "args": []
     },
