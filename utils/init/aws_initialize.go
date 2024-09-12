@@ -213,9 +213,13 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 
 	query += "a.layer = 0"
 
-	neo4j.ExecuteQuery(ctx, driver, query,
-		neo4j.EagerResultTransformer, nil,
+	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	error_check(err)
+
+	fmt.Println("[+] Added: ", result.Summary)
 
 }
 
@@ -230,27 +234,38 @@ func ingest_relationships(ctx context.Context, driver neo4j.DriverWithContext, f
 		"} IN TRANSACTIONS"
 
 	//executeQuery(context, driver, query, params, resultTransformer)
-	neo4j.ExecuteQuery(ctx, driver, query,
-		neo4j.EagerResultTransformer, nil,
+	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
+	error_check(err)
+
+	fmt.Println("[+] Added: ", result.Summary)
 }
 
 func create_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, label string, property string) {
 	query := "CREATE CONSTRAINT  " + constraint_name + " IF NOT EXISTS FOR (n: " + label + ") REQUIRE n." + property + " IS UNIQUE"
 
-	neo4j.ExecuteQuery(ctx, driver, query,
-		neo4j.EagerResultTransformer, nil,
+	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	error_check(err)
+
+	fmt.Println("[+] Added: ", result.Summary)
 }
 
 func create_relationship_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, rel_name string, unique_property_name string) {
 	query := "CREATE CONSTRAINT " + constraint_name + " IF NOT EXISTS " +
 		"FOR () - [r:" + rel_name + "] -() REQUIRE (r." + unique_property_name + " IS UNIQUE"
 
-	neo4j.ExecuteQuery(ctx, driver, query,
-		neo4j.EagerResultTransformer, nil,
+	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
+
+	error_check(err)
+
+	fmt.Println("[+] Added: ", result.Summary)
 }
 
 func write_data_to_csv(filename string, data []string) {
