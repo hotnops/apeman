@@ -20,6 +20,14 @@ type PermissionMapping struct {
 	Actions map[string][]graph.ID `json:"actions"`
 }
 
+// Get all the policies attached to a particular action node
+func GetActionPolicies(ctx context.Context, db graph.Database, action string) (graph.PathSet, error) {
+	query := "MATCH p=(a:AWSAction) <- [:ExpandsTo|Action*1..2] - (s:AWSStatement) - [:AttachedTo*2..3] - (pol:AWSManagedPolicy|AWSInlinePolicy) WHERE a.name = '%s' RETURN p"
+	query = fmt.Sprintf(query, action)
+	paths, err := CypherQueryPaths(ctx, db, query)
+	return paths, err
+}
+
 func GetInboundRolePaths(ctx context.Context, db graph.Database, roleId string) (graph.PathSet, error) {
 	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform* {name: 'sts:assumerole'}] -> (b:AWSRole) WHERE b.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
 	query = fmt.Sprintf(query, roleId)

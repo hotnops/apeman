@@ -10,6 +10,7 @@ import { kinds } from "../services/nodeService";
 import PolicyOverview from "./PolicyOverview";
 import UserOverviewPanel from "./UserOverviewPanel";
 import GroupOverviewPanel from "./GroupOverviewPanel";
+import ActionOverviewPanel from "./ActionOverviewPanel";
 
 interface Props {
   node: Node;
@@ -27,6 +28,7 @@ const NodeOverviewPanel = ({ node }: Props) => {
     [kinds.AWSGroup, "Group Overview"],
     [kinds.UniqueArn, "Resource Overview"],
     [kinds.AWSStatement, "Statement Overview"],
+    [kinds.AWSAction, "Action Overview"],
   ]);
 
   return (
@@ -39,41 +41,50 @@ const NodeOverviewPanel = ({ node }: Props) => {
         size="sm"
       >
         <TabList>
-          {nodeKinds.map((kind) => (
-            <Tab fontSize="xs" key={kind}>
-              {tabTitleMap.get(kind)}
-            </Tab>
-          ))}
+          {nodeKinds.map(
+            (kind) =>
+              tabTitleMap.get(kind) && (
+                <Tab fontSize="xs" key={kind}>
+                  {tabTitleMap.get(kind)}
+                </Tab>
+              )
+          )}
           <Tab fontSize="xs" key="nodeOverview">
             Node Overview
           </Tab>
         </TabList>
         <TabPanels>
-          {nodeKinds.map((kind) => (
-            <TabPanel key={kind}>
-              {kind === kinds.AWSAccount ? (
-                <AccountOverviewPanel node={node}></AccountOverviewPanel>
-              ) : null}
-              {kind === kinds.AWSRole ? (
-                <RoleOverviewPanel node={node}></RoleOverviewPanel>
-              ) : null}
-              {kind === kinds.AWSUser ? (
-                <UserOverviewPanel node={node}></UserOverviewPanel>
-              ) : null}
-              {kind === kinds.AWSGroup ? (
-                <GroupOverviewPanel node={node}></GroupOverviewPanel>
-              ) : null}
-              {kind === kinds.UniqueArn ? (
-                <ResourceOverview node={node} />
-              ) : null}
-              {kind === kinds.AWSStatement ? (
-                <StatementOverview node={node}></StatementOverview>
-              ) : null}
-              {kind === kinds.AWSManagedPolicy ? (
-                <PolicyOverview node={node}></PolicyOverview>
-              ) : null}
-            </TabPanel>
-          ))}
+          {nodeKinds.map(
+            (kind) =>
+              tabTitleMap.get(kind) && (
+                <TabPanel key={kind}>
+                  {kind === kinds.AWSAccount ? (
+                    <AccountOverviewPanel node={node}></AccountOverviewPanel>
+                  ) : null}
+                  {kind === kinds.AWSRole ? (
+                    <RoleOverviewPanel node={node}></RoleOverviewPanel>
+                  ) : null}
+                  {kind === kinds.AWSUser ? (
+                    <UserOverviewPanel node={node}></UserOverviewPanel>
+                  ) : null}
+                  {kind === kinds.AWSGroup ? (
+                    <GroupOverviewPanel node={node}></GroupOverviewPanel>
+                  ) : null}
+                  {kind === kinds.UniqueArn ? (
+                    <ResourceOverview node={node} />
+                  ) : null}
+                  {kind === kinds.AWSStatement ? (
+                    <StatementOverview node={node}></StatementOverview>
+                  ) : null}
+                  {kind === kinds.AWSManagedPolicy ? (
+                    <PolicyOverview node={node}></PolicyOverview>
+                  ) : null}
+                  {kind === kinds.AWSAction ? (
+                    <ActionOverviewPanel node={node}></ActionOverviewPanel>
+                  ) : null}
+                </TabPanel>
+              )
+          )}
           <TabPanel>
             <NodeOverview node={node}></NodeOverview>
           </TabPanel>

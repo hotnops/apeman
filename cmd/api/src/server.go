@@ -167,6 +167,7 @@ func (s *Server) handleRequests() {
 	s.addNodeEndpoints(router.Group("/nodes/:nodeid"))
 	s.addGroupsEndpoints(router.Group("/groups/:groupid"))
 	s.addAccountsEndpoints(router.Group("/accounts/:accountid"))
+	s.addActionsEndpoints(router.Group("/actions/:actionname"))
 
 	router.GET("/nodes", s.GetAWSNodes)
 	router.GET("/accounts", s.GetAWSAccountIDs)
