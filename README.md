@@ -25,7 +25,7 @@
 
 - Docker
 - Docker compose
-- Python 3
+- Python 3.9+
 
 ```
 sudo apt install python
