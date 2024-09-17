@@ -5,6 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Launch Go file",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${file}",
+      "args": ["-o", "/home/vader/apeman/import/"]
+    },
+    {
       "name": "Launch harness",
       "type": "go",
       "request": "launch",
@@ -19,15 +27,6 @@
       "mode": "debug",
       "cwd": "${workspaceFolder}/cmd/api",
       "program": "${workspaceFolder}/cmd/api/main.go"
-    },
-    {
-      "name": "Launch Golang",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${file}",
-      "env": {},
-      "args": []
     },
     {
       "name": "Connect to delve server",

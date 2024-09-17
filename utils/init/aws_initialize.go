@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -239,13 +241,21 @@ func ingest_relationships(ctx context.Context, driver neo4j.DriverWithContext, f
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 	//executeQuery(context, driver, query, params, resultTransformer)
 	/*
-
-
-
 		error_check(err)
 
 		fmt.Println("[+] Added: ", result.Summary)
 	*/
+}
+
+func load_csvs_into_db(ctx context.Context, driver neo4j.DriverWithContext) {
+	ingest_csv(ctx, driver, "awsmultivaluedprefix.csv", "AWSMultivalueOperator:UniqueName", []string{"name"})
+	ingest_csv(ctx, driver, "awsresourcetypes.csv", "AWSResourceType:UniqueName", []string{"name", "arn", "regex"})
+	ingest_csv(ctx, driver, "awsglobalconditionkeys.csv", "AWSConditionKey:UniqueName", []string{"name"})
+	ingest_csv(ctx, driver, "awsconditionkeys.csv", "AWSConditionKey:UniqueName", []string{"name"})
+	ingest_csv(ctx, driver, "awsactions.csv", "AWSAction:UniqueName", []string{"name", "access_level"})
+	ingest_csv(ctx, driver, "awsservices.csv", "AWSService:UniqueName", []string{"name", "prefix", "url"})
+	ingest_relationships(ctx, driver, "actions_to_resourcetypes_rels.csv", "AWSAction:UniqueName", "name", "ActsOn", "AWSResourceType:UniqueName", "name")
+
 }
 
 func create_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, label string, property string) {
@@ -269,22 +279,21 @@ func create_relationship_constraint(ctx context.Context, driver neo4j.DriverWith
 func create_constraints_in_neo4j(ctx context.Context, driver neo4j.DriverWithContext) {
 
 	create_constraint(ctx, driver, "awsactionconstraint", "AWSAction", "name")
-	create_constraint(ctx,driver, "actionblobconstraint", "AWSActionBlob", "name")
-	create_constraint(ctx, driver, "assumerolepolicyconstraint","AWSAssumeRolePolicy", "hash")
-    create_constraint(ctx, driver, , "conditionconstraint","AWSCondition", "hash")
-    create_constraint(ctx, driver, "conditionvalueconstraint","AWSConditionValue", "name")
-    create_constraint(ctx, driver, "groupconstraint","AWSGroup", "arn")
-    create_constraint(ctx, driver, "inlinepolicyconstraint","AWSInlinePolicy", "hash")
-    create_constraint(ctx, driver, "managedpolicyconstraint","AWSManagedPolicy", "arn")
-    create_constraint(ctx, driver, "policydocumentconstraint","AWSPolicyDocument", "hash")
-    create_constraint(ctx, driver, "policyversionconstraint","AWSPolicyVersion", "hash")
-    create_constraint(ctx, driver, "roleconstraint","AWSRole", "arn")
-    create_constraint(ctx, driver, "statementconstraint","AWSStatement", "hash")
-    create_constraint(ctx, driver, "userconstraint","AWSUser", "arn")
-    create_constraint(ctx, driver, "resourceblobconstraint","AWSResourceBlob", "name")
-    create_constraint(ctx, driver, "tagconstraint","AWSTag", "hash")
-    create_constraint(ctx, driver, "uniquehashconstraint", "UniqueHash", "hash")
-
+	create_constraint(ctx, driver, "actionblobconstraint", "AWSActionBlob", "name")
+	create_constraint(ctx, driver, "assumerolepolicyconstraint", "AWSAssumeRolePolicy", "hash")
+	create_constraint(ctx, driver, "conditionconstraint", "AWSCondition", "hash")
+	create_constraint(ctx, driver, "conditionvalueconstraint", "AWSConditionValue", "name")
+	create_constraint(ctx, driver, "groupconstraint", "AWSGroup", "arn")
+	create_constraint(ctx, driver, "inlinepolicyconstraint", "AWSInlinePolicy", "hash")
+	create_constraint(ctx, driver, "managedpolicyconstraint", "AWSManagedPolicy", "arn")
+	create_constraint(ctx, driver, "policydocumentconstraint", "AWSPolicyDocument", "hash")
+	create_constraint(ctx, driver, "policyversionconstraint", "AWSPolicyVersion", "hash")
+	create_constraint(ctx, driver, "roleconstraint", "AWSRole", "arn")
+	create_constraint(ctx, driver, "statementconstraint", "AWSStatement", "hash")
+	create_constraint(ctx, driver, "userconstraint", "AWSUser", "arn")
+	create_constraint(ctx, driver, "resourceblobconstraint", "AWSResourceBlob", "name")
+	create_constraint(ctx, driver, "tagconstraint", "AWSTag", "hash")
+	create_constraint(ctx, driver, "uniquehashconstraint", "UniqueHash", "hash")
 
 }
 func create_indices(ctx context.Context, driver neo4j.DriverWithContext) {
@@ -378,18 +387,22 @@ func main() {
 	var output_directory string
 	var input_schema string
 
-	flag.StringVar(&output_directory, "-o", "../import/", "The directory to output csv files. This will default to import directory.")
-	flag.StringVar(&output_directory, "--o", "../import/", "The directory to output csv files. This will default to import directory.")
+	flag.StringVar(&output_directory, "o", "/import/", "The directory to output csv files. This will default to import directory.")
+	flag.StringVar(&output_directory, "output", "/import/", "The directory to output csv files. This will default to import directory.")
 
-	flag.StringVar(&input_schema, "-i", "", "The AWS input schema")
-	flag.StringVar(&input_schema, "--input-schema", "", "The AWS input schema")
+	flag.StringVar(&input_schema, "i", "", "The AWS input schema")
+	flag.StringVar(&input_schema, "input-schema", "", "The AWS input schema")
 
-	/*
-		//urls that will be used to grab services, policies, and actions
-		service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
-		base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
-		service_json_url := base_url + "toc-contents.json"
-	*/
+	var (
+		_, b, _, _ = runtime.Caller(0)
+		basepath   = filepath.Dir(b)
+	)
+	output := (filepath.Join(basepath, "../../")) + output_directory
+
+	//urls that will be used to grab services, policies, and actions
+	service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
+	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
+	service_json_url := base_url + "toc-contents.json"
 
 	//context for neo4j database
 	ctx := context.Background()
@@ -406,55 +419,55 @@ func main() {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer session.Close(ctx)
 
-	/*
-		services_metadata, err := get_service_metadata(service_url)
+	services_metadata, err := get_service_metadata(service_url)
+	error_check(err)
+
+	actionMap := make(map[string]Actions)
+	serviceMap := make(map[string]interface{})
+
+	//awsglobalconditionkeys.csv
+	write_data_to_csv((output + "awsglobalconditionkeys.csv"), services_metadata.ConditionKeys)
+	fmt.Println("[*] Condition keys written to awsglobalconditionkeys.csv")
+
+	//awsoperators.csv
+	write_data_to_csv((output + "awsoperators.csv"), services_metadata.ConditionOperators)
+	fmt.Println("[*] Operators written to awsoperators.csv")
+
+	fmt.Println("[*] Gathering URLs of services")
+	href := get_services_json_href(service_json_url)
+
+	fmt.Println("[*] Gathering Metadata of services")
+	for title, url := range href {
+		action_metadata, err := get_service_dict(base_url + url)
 		error_check(err)
+		actionMap = make(map[string]Actions)
 
-		actionMap := make(map[string]Actions)
-		serviceMap := make(map[string]interface{})
-
-		//awsglobalconditionkeys.csv
-		write_data_to_csv("awsglobalconditionkeys.csv", services_metadata.ConditionKeys)
-		fmt.Println("[*] Condition keys written to awsglobalconditionkeys.csv")
-
-		//awsoperators.csv
-		write_data_to_csv("awsoperators.csv", services_metadata.ConditionOperators)
-		fmt.Println("[*] Operators written to awsoperators.csv")
-
-		fmt.Println("[*] Gathering URLs of services")
-		href := get_services_json_href(service_json_url)
-
-		fmt.Println("[*] Gathering Metadata of services")
-		for title, url := range href {
-			action_metadata, err := get_service_dict(base_url + url)
-			error_check(err)
-			actionMap = make(map[string]Actions)
-
-			for _, items := range action_metadata {
-				actionMap[items.Action] = items
-			}
-			serviceMap[title] = actionMap
-			fmt.Println(serviceMap[title])
+		for _, items := range action_metadata {
+			actionMap[items.Action] = items
 		}
+		serviceMap[title] = actionMap
+		fmt.Println(serviceMap[title])
+	}
 
-		//write json file
-		fmt.Println("[*] Writing to json file")
+	//write json file
+	fmt.Println("[*] Writing to json file")
 
-		//convert servicemap to json
-		json_output, err := json.MarshalIndent(serviceMap, "", "  ")
-		error_check(err)
+	//convert servicemap to json
+	json_output, err := json.MarshalIndent(serviceMap, "", "  ")
+	error_check(err)
 
-		//create and write to file
-		aws_scheme_filewriter, err := os.Create("awsschema-test.json")
-		error_check(err)
+	//create and write to file
+	aws_scheme_filewriter, err := os.Create("awsschema-test.json")
+	error_check(err)
 
-		defer aws_scheme_filewriter.Close()
-		aws_scheme_filewriter.Write(json_output)
+	defer aws_scheme_filewriter.Close()
+	aws_scheme_filewriter.Write(json_output)
 
-		fmt.Println("[*] Data written to awsschema.json")
-	*/
+	fmt.Println("[*] Data written to awsschema.json")
 
 	//initialize database
-	aws_initialize(ctx, output_directory)
+	load_csvs_into_db(ctx, driver)
+	create_constraints_in_neo4j(ctx, driver)
+	create_indices(ctx, driver)
 
 }
