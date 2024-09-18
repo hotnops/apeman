@@ -61,7 +61,7 @@ func (s *Server) GetAWSRoleOutboundRoles(c *gin.Context) {
 	roleId := c.Param("roleid")
 
 	//paths, err := queries.GetAWSRoleInboundRoleAssumptionPaths(s.ctx, s.db, roleId)
-	query := "MATCH p=(a:AWSRole) - [:IdentityTransform* {name: 'sts:assumerole'}] -> (b:AWSRole) WHERE a.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
+	query := "MATCH p=(a:AWSRole) - [:IdentityTransform*] -> (b:AWSRole) WHERE a.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
 	query = fmt.Sprintf(query, roleId)
 	paths, err := queries.CypherQueryPaths(s.ctx, s.db, query)
 

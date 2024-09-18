@@ -29,7 +29,7 @@ func GetActionPolicies(ctx context.Context, db graph.Database, action string) (g
 }
 
 func GetInboundRolePaths(ctx context.Context, db graph.Database, roleId string) (graph.PathSet, error) {
-	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform* {name: 'sts:assumerole'}] -> (b:AWSRole) WHERE b.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
+	query := "MATCH p=(a:UniqueArn) - [:IdentityTransform*] -> (b:AWSRole) WHERE b.roleid = '%s' AND ALL(n IN nodes(p) WHERE SINGLE(x IN nodes(p) WHERE x = n)) RETURN p"
 	query = fmt.Sprintf(query, roleId)
 	paths, err := CypherQueryPaths(ctx, db, query)
 
@@ -392,6 +392,45 @@ func (c *Counter) Increment() int {
 	defer c.mu.Unlock()
 	c.count++
 	return c.count
+}
+
+func CreateUpdateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
+	// 1. Get all roles
+	actionName := "iam:updateassumerolepolicy"
+	roles, err := analyze.GetAWSNodesByKind(ctx, db, aws.AWSRole)
+	if err != nil {
+		return err
+	}
+
+	for _, role := range roles {
+		arnString, err := role.Properties.Get("arn").String()
+		if err != nil {
+			return err
+		}
+		identityPaths, err := GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx, db, arnString, actionName)
+		if err != nil {
+			return err
+		}
+		resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+		if err != nil {
+			return err
+		}
+		for _, path := range *resolvedPaths {
+			if err := CreateIdentityTransformEdge(ctx,
+				db,
+				[]graph.ID{path.PrincipalID},
+				path.ResourceID,
+				string(aws.IdentityTransformUpdateAssumeRolePolicy)); err != nil {
+				return err
+			}
+
+		}
+
+	}
+	// 2. For each role, get all principals that can update assume role policy
+	// 3. For each principal, create a IdentityTransform edge
+	return nil
+
 }
 
 func CreateAssumeRoleEdges(ctx context.Context, db graph.Database) error {

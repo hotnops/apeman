@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hotnops/apeman/graphschema/aws"
@@ -123,12 +124,25 @@ func (s *Server) Search(c *gin.Context) {
 	}
 }
 
-func (s *Server) GetAllAssumeRoles(c *gin.Context) {
-	err := queries.CreateAssumeRoleEdges(s.ctx, s.db)
+func (s *Server) AnalyzeIdentityTransforms(c *gin.Context) {
+	wg := sync.WaitGroup{}
 
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	}
+	// go func1() {
+	// 	defer wg.Done()
+	// 	queries.CreateAssumeRoleEdges(s.ctx, s.db, &wg)
+	// }()
+	// go
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		queries.CreateAssumeRoleEdges(s.ctx, s.db)
+	}()
+	go func() {
+		defer wg.Done()
+		queries.CreateUpdateAssumeRoleEdges(s.ctx, s.db)
+	}()
+
+	wg.Wait()
 	c.Done()
 }
 
@@ -174,7 +188,7 @@ func (s *Server) handleRequests() {
 
 	router.GET("/permissionpath/:sourcenodeid/:destnodeid", s.GetNodePermissionPath)
 	router.GET("/relationship/:relationshipid", s.GetAWSRelationshipByGraphID)
-	router.GET("/analyze/assumeroles", s.GetAllAssumeRoles)
+	router.GET("/analyze/identitytransforms", s.AnalyzeIdentityTransforms)
 	router.GET("/search", s.Search)
 	router.POST("/query", s.PostQuery)
 	router.Run("0.0.0.0:4400")

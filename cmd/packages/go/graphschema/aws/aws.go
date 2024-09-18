@@ -79,4 +79,5 @@ type IdentityTrasformType string
 
 const (
 	IdentityTransformAssumeRole IdentityTrasformType = "sts:assumerole"
+	IdentityTransformUpdateAssumeRolePolicy IdentityTrasformType = "iam:updateassumerolepolicy"
 )
