@@ -394,6 +394,44 @@ func (c *Counter) Increment() int {
 	return c.count
 }
 
+func CreateCreateAccessKeyEdges(ctx context.Context, db graph.Database) error {
+	// 1. Get all roles
+	actionName := "iam:createaccesskey"
+	nodes, err := analyze.GetAWSNodesByKind(ctx, db, aws.AWSUser)
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes {
+		arnString, err := node.Properties.Get("arn").String()
+		if err != nil {
+			return err
+		}
+		identityPaths, err := GetAllUnresolvedIdentityPolicyPathsOnArnWithAction(ctx, db, arnString, actionName)
+		if err != nil {
+			return err
+		}
+		resolvedPaths, err := analyze.ResolveResourceAgainstIdentityPolicies(&analyze.ActionPathSet{}, identityPaths)
+		if err != nil {
+			return err
+		}
+		for _, path := range *resolvedPaths {
+			if err := CreateIdentityTransformEdge(ctx,
+				db,
+				[]graph.ID{path.PrincipalID},
+				path.ResourceID,
+				string(aws.IdentityTransformCreateAccessKey)); err != nil {
+				return err
+			}
+
+		}
+
+	}
+
+	return nil
+
+}
+
 func CreateUpdateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
 	// 1. Get all roles
 	actionName := "iam:updateassumerolepolicy"
@@ -427,8 +465,7 @@ func CreateUpdateAssumeRoleEdges(ctx context.Context, db graph.Database) error {
 		}
 
 	}
-	// 2. For each role, get all principals that can update assume role policy
-	// 3. For each principal, create a IdentityTransform edge
+
 	return nil
 
 }

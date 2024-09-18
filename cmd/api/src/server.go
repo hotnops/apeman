@@ -132,7 +132,7 @@ func (s *Server) AnalyzeIdentityTransforms(c *gin.Context) {
 	// 	queries.CreateAssumeRoleEdges(s.ctx, s.db, &wg)
 	// }()
 	// go
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		queries.CreateAssumeRoleEdges(s.ctx, s.db)
@@ -140,6 +140,10 @@ func (s *Server) AnalyzeIdentityTransforms(c *gin.Context) {
 	go func() {
 		defer wg.Done()
 		queries.CreateUpdateAssumeRoleEdges(s.ctx, s.db)
+	}()
+	go func() {
+		defer wg.Done()
+		queries.CreateCreateAccessKeyEdges(s.ctx, s.db)
 	}()
 
 	wg.Wait()
