@@ -3,15 +3,12 @@ package analyze
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/hotnops/apeman/graphschema/aws"
 	"github.com/specterops/bloodhound/analysis"
-	"github.com/specterops/bloodhound/dawgs/cardinality"
 	"github.com/specterops/bloodhound/dawgs/graph"
-	"github.com/specterops/bloodhound/dawgs/graphcache"
 	"github.com/specterops/bloodhound/dawgs/ops"
 	"github.com/specterops/bloodhound/dawgs/query"
 	"github.com/specterops/bloodhound/dawgs/traversal"
@@ -265,46 +262,16 @@ func GetAWSNodeByGraphID(ctx context.Context, db graph.Database, id graph.ID) (*
 	return node, err
 }
 
-func GetAWSNodesByKind(ctx context.Context, db graph.Database, nodeKind graph.Kind) (cardinality.Duplex[uint32], error) {
-	var fetchedNodes cardinality.Duplex[uint32]
+func GetAWSNodesByKind(ctx context.Context, db graph.Database, nodeKind graph.Kind) (graph.NodeSet, error) {
+	var fetchedNodes graph.NodeSet
 
 	return fetchedNodes, db.ReadTransaction(ctx, func(tx graph.Transaction) error {
 		if nodes, err := ops.FetchNodeSet(tx.Nodes().Filter(query.Kind(query.Node(), nodeKind))); err != nil {
 			return err
 		} else {
-			fetchedNodes = cardinality.NodeSetToDuplex(nodes)
+			fetchedNodes = nodes
 		}
 
 		return nil
-	})
-}
-
-func statementIncludesAction(ctx context.Context, db graph.Database, statemetId graph.ID, action string) (bool, error) {
-	var (
-		traversalInst = traversal.New(db, runtime.NumCPU())
-	)
-
-	actionFound := false
-
-	return actionFound, traversalInst.BreadthFirst(ctx, traversal.Plan{
-		Root: graph.NewNode(statemetId, graph.NewProperties(), aws.AWSStatement),
-		Driver: traversal.LightweightDriver(
-			graph.DirectionOutbound,
-			graphcache.New(),
-			query.And(
-				query.Kind(query.End(), aws.AWSAction),
-				query.KindIn(query.Relationship(), aws.AllowAction, aws.ExpandsTo),
-			),
-			func(next *graph.PathSegment) bool {
-				return next.Depth() < 3
-			},
-			func(next *graph.PathSegment) {
-				// This function is called when a path is considered complete and has no more expansions
-				path := next.Path()
-				if len(path.Nodes) > 2 {
-					actionFound = true
-				}
-			},
-		),
 	})
 }

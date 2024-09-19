@@ -114,9 +114,9 @@ def populate_arn_fields(session):
     session.run(cypher_query)
 
 
-def analyze_assume_roles():
+def analyze_identity_transforms():
     print("[*] Analyzing assume roles")
-    resp = requests.get("http://apeman-backend.localhost/analyze/assumeroles")
+    resp = requests.get("http://apeman-backend.localhost/analyze/identitytransforms")
     if resp.status_code == 200:
         print("[*] Assume role analysis complete")
     else:
@@ -139,7 +139,7 @@ def analyze():
         # This is the first migration into server
         # based analysis. All others will move over
         # to API calls
-        analyze_assume_roles()
+        analyze_identity_transforms()
 
 
 if __name__ == "__main__":
