@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -197,7 +194,7 @@ func get_service_dict(link string) ([]Actions, error) {
 // and run query with session.Run(context.Background(), query, params)
 
 func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename string, datatype string, fields []string) {
-	query := "LOAD CSV FROM \"file:///" + filename + " AS row WITH "
+	query := "LOAD CSV FROM 'file:///" + filename + "' AS row WITH "
 
 	row_names := ", "
 	var rows []string
@@ -208,7 +205,7 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 	query += strings.Join(rows, row_names)
 
 	query += ("MERGE (a:" + datatype + "{{" + fields[0] + ":" + fields[0] + "}})" +
-		"ON CREATE SET ")
+		" ON CREATE SET ")
 
 	for _, field := range fields {
 		query += "a." + field + " = " + field + ", "
@@ -228,7 +225,7 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 
 func ingest_relationships(ctx context.Context, driver neo4j.DriverWithContext, file string, source_label string, source_field string, dest_label string, dest_field string, rel_name string) {
 
-	query := "LOAD CSV FROM \"file:///" + file + " AS row CALL WITH row' " +
+	query := "LOAD CSV FROM 'file:///" + file + "' AS row CALL WITH row " +
 		"MERGE (s:" + source_label + " {{" + source_field + " +: row[0]}}) " +
 		"ON CREATE SET s.inferred = true " +
 		"MERGE (d:" + dest_label + " {{" + dest_field + " : row[1]}}) " +
@@ -382,28 +379,29 @@ func error_check(err error) {
 }
 
 func main() {
+	/*
+		//take in command line arguments
+		var output_directory string
+		var input_schema string
 
-	//take in command line arguments
-	var output_directory string
-	var input_schema string
+		flag.StringVar(&output_directory, "o", "/import/", "The directory to output csv files. This will default to import directory.")
+		flag.StringVar(&output_directory, "output", "/import/", "The directory to output csv files. This will default to import directory.")
 
-	flag.StringVar(&output_directory, "o", "/import/", "The directory to output csv files. This will default to import directory.")
-	flag.StringVar(&output_directory, "output", "/import/", "The directory to output csv files. This will default to import directory.")
+		flag.StringVar(&input_schema, "i", "", "The AWS input schema")
+		flag.StringVar(&input_schema, "input-schema", "", "The AWS input schema")
 
-	flag.StringVar(&input_schema, "i", "", "The AWS input schema")
-	flag.StringVar(&input_schema, "input-schema", "", "The AWS input schema")
+		var (
+			_, b, _, _ = runtime.Caller(0)
+			basepath   = filepath.Dir(b)
+		)
+		output := (filepath.Join(basepath, "../../")) + output_directory
 
-	var (
-		_, b, _, _ = runtime.Caller(0)
-		basepath   = filepath.Dir(b)
-	)
-	output := (filepath.Join(basepath, "../../")) + output_directory
 
-	//urls that will be used to grab services, policies, and actions
-	service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
-	base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
-	service_json_url := base_url + "toc-contents.json"
-
+			//urls that will be used to grab services, policies, and actions
+			service_url := "https://awspolicygen.s3.amazonaws.com/js/policies.js"
+			base_url := "https://docs.aws.amazon.com/service-authorization/latest/reference/"
+			service_json_url := base_url + "toc-contents.json"
+	*/
 	//context for neo4j database
 	ctx := context.Background()
 	//initialize database
@@ -418,56 +416,66 @@ func main() {
 	// Create a session
 	session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer session.Close(ctx)
+	/*
+		services_metadata, err := get_service_metadata(service_url)
+		error_check(err)
 
-	services_metadata, err := get_service_metadata(service_url)
-	error_check(err)
-
-	actionMap := make(map[string]Actions)
-	serviceMap := make(map[string]interface{})
+		actionMap := make(map[string]Actions)
+		serviceMap := make(map[string]interface{})
+	*/
 
 	//awsglobalconditionkeys.csv
-	write_data_to_csv((output + "awsglobalconditionkeys.csv"), services_metadata.ConditionKeys)
+	//write_data_to_csv((output + "awsglobalconditionkeys.csv"), services_metadata.ConditionKeys)
 	fmt.Println("[*] Condition keys written to awsglobalconditionkeys.csv")
 
 	//awsoperators.csv
-	write_data_to_csv((output + "awsoperators.csv"), services_metadata.ConditionOperators)
+	//write_data_to_csv((output + "awsoperators.csv"), services_metadata.ConditionOperators)
 	fmt.Println("[*] Operators written to awsoperators.csv")
 
 	fmt.Println("[*] Gathering URLs of services")
-	href := get_services_json_href(service_json_url)
+	//href := get_services_json_href(service_json_url)
 
 	fmt.Println("[*] Gathering Metadata of services")
-	for title, url := range href {
-		action_metadata, err := get_service_dict(base_url + url)
-		error_check(err)
-		actionMap = make(map[string]Actions)
+	/*
+		for title, url := range href {
+			action_metadata, err := get_service_dict(base_url + url)
+			error_check(err)
+			actionMap = make(map[string]Actions)
 
-		for _, items := range action_metadata {
-			actionMap[items.Action] = items
+			for _, items := range action_metadata {
+				actionMap[items.Action] = items
+			}
+			serviceMap[title] = actionMap
+			//fmt.Println(serviceMap[title])
 		}
-		serviceMap[title] = actionMap
-		fmt.Println(serviceMap[title])
-	}
-
+	*/
 	//write json file
 	fmt.Println("[*] Writing to json file")
 
 	//convert servicemap to json
-	json_output, err := json.MarshalIndent(serviceMap, "", "  ")
-	error_check(err)
+	//json_output, err := json.MarshalIndent(serviceMap, "", "  ")
+	//error_check(err)
 
-	//create and write to file
-	aws_scheme_filewriter, err := os.Create("awsschema-test.json")
-	error_check(err)
+	/*
+		//create and write to file
+		aws_scheme_filewriter, err := os.Create("awsschema-test.json")
+		error_check(err)
 
-	defer aws_scheme_filewriter.Close()
-	aws_scheme_filewriter.Write(json_output)
-
+		defer aws_scheme_filewriter.Close()
+		aws_scheme_filewriter.Write(json_output)
+	*/
 	fmt.Println("[*] Data written to awsschema.json")
 
 	//initialize database
+	fmt.Println("[*] Loading csv's into db")
 	load_csvs_into_db(ctx, driver)
+
+	fmt.Println("[*] Creating Constraints")
 	create_constraints_in_neo4j(ctx, driver)
+
+	fmt.Println("[*] Creating Indices")
 	create_indices(ctx, driver)
+
+	fmt.Println("[*] Complete")
 
 }

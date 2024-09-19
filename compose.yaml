@@ -33,10 +33,7 @@ services:
       - NEO4J_server_memory_pagecache_size=4G
 
   apeman-frontend:
-    build:
-      context: ui/apeman-ui
-      dockerfile: Dockerfile
-    image: apeman-frontend
+    image: hotnops/apeman-frontend:latest
     labels:
       - traefik.enable=true
       - traefik.http.routers.apeman-frontend.rule=Host(`apeman.localhost`)
@@ -44,14 +41,10 @@ services:
       - traefik.http.services.apeman-frontend.loadbalancer.server.port=80
 
   apeman-backend:
-    build:
-      context: ./cmd
-      dockerfile: Dockerfile
-    image: apeman-backend
+    image: hotnops/apeman-backend:latest
     labels:
       - traefik.enable=true
       - traefik.http.routers.apeman-backend.rule=Host(`apeman-backend.localhost`)
       - traefik.http.routers.apeman-backend.service=apeman-backend
       - traefik.http.services.apeman-backend.loadbalancer.server.port=4400
-
 
