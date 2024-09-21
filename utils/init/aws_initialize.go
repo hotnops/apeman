@@ -200,11 +200,11 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 	var rows []string
 
 	for i := 0; i < len(fields); i++ {
-		rows = append(rows, ("row[" + strconv.Itoa(i) + "] as {" + fields[i] + "}"))
+		rows = append(rows, ("row[" + strconv.Itoa(i) + "] as " + fields[i]))
 	}
 	query += strings.Join(rows, row_names)
 
-	query += ("MERGE (a:" + datatype + "{{" + fields[0] + ":" + fields[0] + "}})" +
+	query += (" MERGE (a:" + datatype + " {" + fields[0] + ":" + fields[0] + "})" +
 		" ON CREATE SET ")
 
 	for _, field := range fields {
@@ -218,8 +218,8 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
 	error_check(err)
-
-	fmt.Println("[+] Added: ", result.Summary)
+	fmt.Println(result)
+	fmt.Println("[*] Added: ", filename)
 
 }
 
