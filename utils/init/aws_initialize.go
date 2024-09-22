@@ -254,12 +254,13 @@ func load_csvs_into_db(ctx context.Context, driver neo4j.DriverWithContext) {
 }
 
 func create_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, label string, property string) {
-	query := "CREATE CONSTRAINT  " + constraint_name + " IF NOT EXISTS FOR (n: " + label + ") REQUIRE n." + property + " IS UNIQUE"
+	query := "CREATE CONSTRAINT " + constraint_name + " IF NOT EXISTS FOR (n: " + label + ") REQUIRE n." + property + " IS UNIQUE"
 
 	neo4j.ExecuteQuery(ctx, driver, query,
 		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
+	fmt.Println("[*] Created Constraint: " + constraint_name)
 }
 
 func create_relationship_constraint(ctx context.Context, driver neo4j.DriverWithContext, constraint_name string, rel_name string, unique_property_name string) {
