@@ -213,12 +213,10 @@ func ingest_csv(ctx context.Context, driver neo4j.DriverWithContext, filename st
 
 	query += "a.layer = 0"
 
-	result, err := neo4j.ExecuteQuery(ctx, driver, query,
+	neo4j.ExecuteQuery(ctx, driver, query,
 		nil, neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
-	error_check(err)
-	fmt.Println(result)
 	fmt.Println("[*] Added: ", filename)
 
 }
