@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       - closed # Triggers when a pull request is closed (which includes merging)
+      - workflow_dispatch
 
 jobs:
   docker-publish:
