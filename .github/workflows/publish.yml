@@ -34,7 +34,7 @@ jobs:
       - name: Build and push apeman-backend Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./cmd
-          dockerfile: ./cmd/Dockerfile
+          context: ./go/
+          dockerfile: ./go/deployments/Dockerfile
           push: true
           tags: ${{ github.repository_owner }}/apeman-backend:latest
