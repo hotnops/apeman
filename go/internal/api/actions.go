@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hotnops/apeman/src/api/src/queries"
+	"github.com/hotnops/apeman/go/internal/queries"
 )
 
 func (s *Server) GetActionPolicies(c *gin.Context) {

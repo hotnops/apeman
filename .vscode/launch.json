@@ -31,7 +31,7 @@
             "showLog": true,
             "substitutePath": [
                 {
-                    "from":"${workspaceFolder}/cmd",
+                    "from":"${workspaceFolder}/go",
                     "to":"/src"
                 }
             ]

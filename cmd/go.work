@@ -1,8 +1,0 @@
-go 1.20
-
-use (
-	./
-	./packages/go/analyze
-	./packages/go/awsconditions
-	./packages/go/graphschema
-)

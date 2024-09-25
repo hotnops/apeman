@@ -4,8 +4,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/specterops/bloodhound/dawgs/graph"
 )
 
 func matchPattern(s, p string) bool {
@@ -220,11 +218,11 @@ func ArnNotLike(a string, b string) bool {
 	return !ArnEquals(a, b)
 }
 
-func IfExists(conditionKey string, path graph.Path) bool {
-	return Null(conditionKey, false, path)
+func IfExists(conditionKey string) bool {
+	return Null(conditionKey, false)
 }
 
-func Null(conditionKey string, isNull bool, path graph.Path) bool {
+func Null(conditionKey string, isNull bool) bool {
 	// TODO
 	// Get the context of the path
 	// pathContext := context.GetContext(path)
