@@ -14,9 +14,9 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hotnops/apeman/go/internal/config"
+	"github.com/hotnops/apeman/go/internal/queries"
 	"github.com/hotnops/apeman/graphschema/aws"
-	"github.com/hotnops/apeman/src/api/src/queries"
-	"github.com/hotnops/apeman/src/config"
 	"github.com/specterops/bloodhound/dawgs"
 	"github.com/specterops/bloodhound/dawgs/drivers/neo4j"
 	"github.com/specterops/bloodhound/dawgs/graph"
@@ -199,12 +199,27 @@ func (s *Server) handleRequests() {
 }
 
 func (s *Server) InitializeServer() {
-	configFilePath := "dawgsConfig.json"
+	var err error
 	s.ctx = context.Background()
 
-	bhCfg, err := config.GetConfiguration(configFilePath)
-	if err != nil {
-		log.Fatalf("Unable to read configuration %s: %v", configFilePath, err)
+	bhCfg := config.Configuration{
+		Version:     1,
+		BindAddress: "0.0.0.0:8080",
+		MetricsPort: ":2112",
+		RootURL:     "http://127.0.0.1:8080",
+		WorkDir:     "/opt/apeman/work",
+		LogLevel:    "INFO",
+		LogPath:     "apeman.log",
+		TLS: config.TLSConfiguration{
+			CertFile: "",
+			KeyFile:  "",
+		},
+		Database: config.DatabaseConfiguration{
+			Connection: "user=apeman password=apeman dbname=apeman host=app-db",
+		},
+		Neo4J: config.DatabaseConfiguration{
+			Connection: "neo4j://a:b@neo4j:7687/",
+		},
 	}
 
 	s.config = dawgs.Config{

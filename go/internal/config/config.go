@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hotnops/apeman/src/serde"
 	"github.com/specterops/bloodhound/crypto"
 	"github.com/specterops/bloodhound/log"
 )
@@ -145,7 +144,7 @@ type Configuration struct {
 	MaxGraphQueryCacheSize int                       `json:"max_graphdb_cache_size"`
 	MaxAPICacheSize        int                       `json:"max_api_cache_size"`
 	MetricsPort            string                    `json:"metrics_port"`
-	RootURL                serde.URL                 `json:"root_url"`
+	RootURL                string                    `json:"root_url"`
 	WorkDir                string                    `json:"work_dir"`
 	LogLevel               string                    `json:"log_level"`
 	LogPath                string                    `json:"log_path"`

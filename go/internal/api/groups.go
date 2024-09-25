@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hotnops/apeman/go/internal/queries"
 	"github.com/hotnops/apeman/graphschema/aws"
-	"github.com/hotnops/apeman/src/api/src/queries"
 )
 
 func (s *Server) GetAWSGroup(c *gin.Context) {
