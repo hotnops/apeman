@@ -48,4 +48,4 @@ jobs:
 
       - name: Check if Go binary exists
         run: test -f ./main
-        working-directory: ./cmd
+        working-directory: ./go
