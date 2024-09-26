@@ -32,9 +32,6 @@ jobs:
           push: true
           tags: ${{ github.repository_owner }}/apeman-frontend:latest
 
-      - name: Show current directory
-        run: pwd
-
       - name: Build and push apeman-backend Docker image
         uses: docker/build-push-action@v5
         with:
