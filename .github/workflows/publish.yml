@@ -8,7 +8,7 @@ on:
 
 jobs:
   docker-publish:
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main'
+    if: (github.event.pull_request.merged == true && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     steps:
@@ -35,7 +35,7 @@ jobs:
       - name: Build and push apeman-backend Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./go/
+          context: ./go
           dockerfile: ./go/deployments/Dockerfile
           push: true
           tags: ${{ github.repository_owner }}/apeman-backend:latest
