@@ -36,7 +36,7 @@ func populate_resource_blob(ctx context.Context, driver neo4j.DriverWithContext)
 }
 
 
-func populate_Action_blob(ctx context.Context, driver neo4j.DriverWithContext){
+func populate_action_blob(ctx context.Context, driver neo4j.DriverWithContext){
 	fmt.Println("[*] Expanding action blobs")
 	query :=  "MATCH (a:AWSActionBlob)" +
 						" MATCH (b:AWSAction)" +
@@ -70,7 +70,7 @@ func populate_resource_types(ctx context.Context, driver neo4j.DriverWithContext
 
 }
 
-func populate_arn_types(ctx context.Context, driver neo4j.DriverWithContext){
+func populate_arn_fields(ctx context.Context, driver neo4j.DriverWithContext){
 
 	fmt.Println("[*] Populating ARN fields")
 
@@ -110,9 +110,9 @@ func error_check(err error) {
 	}
 }
 
-func main(){
-	
-	ctx := context.Background()
+func analyze(){
+
+	 ctx := context.Background()
 	//initialize database
 	dbUri := "bolt://localhost:7687"
 	driver, err := neo4j.NewDriverWithContext(
@@ -122,5 +122,15 @@ func main(){
 
 	defer driver.Close(ctx)
 
+	//analyze db
+	populate_arn_fields(ctx,driver)
+  populate_resource_types(ctx,driver)
+  populate_action_blob(ctx,driver)
+	populate_resource_blob(ctx,driver)
+	populate_resource_blob(ctx,driver)
 
+}
+
+func main(){
+	analyze()
 }
