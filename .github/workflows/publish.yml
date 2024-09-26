@@ -35,16 +35,11 @@ jobs:
       - name: Show current directory
         run: pwd
 
-      - name: List all files
-        run: ls -la ./go
-
-      - name: List all files
-        run: ls -la ./go/deployments
-
       - name: Build and push apeman-backend Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./go
+          no-cache: true
           dockerfile: ./go/deployments/Dockerfile
           push: true
           tags: ${{ github.repository_owner }}/apeman-backend:latest
