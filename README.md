@@ -159,3 +159,6 @@ In a browser, navigate to:
 ```
 http://apeman.localhost
 ```
+
+# Useful Neo4j Queries
+https://gist.github.com/hotnops/a1d4ab5fc49d4d4190600827da9078f2
