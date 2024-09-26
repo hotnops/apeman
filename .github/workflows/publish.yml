@@ -28,7 +28,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./ui/apeman-ui
-          dockerfile: ./ui/apeman-ui/Dockerfile
+          file: ./ui/apeman-ui/Dockerfile
           push: true
           tags: ${{ github.repository_owner }}/apeman-frontend:latest
 
@@ -38,8 +38,8 @@ jobs:
       - name: Build and push apeman-backend Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./go/deployments
+          context: ./go
           no-cache: true
-          dockerfile: ./go/deployments/Dockerfile
+          file: ./go/deployments/Dockerfile
           push: true
           tags: ${{ github.repository_owner }}/apeman-backend:latest
