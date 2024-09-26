@@ -40,12 +40,12 @@ jobs:
 
       - name: Download Go modules
         run: go mod download
-        working-directory: ./cmd
+        working-directory: ./go
 
       - name: Build Go binary
-        run: go build -ldflags '-s -w' -o main ./api/main.go
-        working-directory: ./cmd
+        run: go build -ldflags '-s -w' -o main ./cmd/apeman/main.go
+        working-directory: ./go
 
       - name: Check if Go binary exists
         run: test -f ./main
-        working-directory: ./cmd
+        working-directory: ./go

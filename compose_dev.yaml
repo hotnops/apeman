@@ -44,16 +44,16 @@ services:
 
   apeman-backend:
     build:
-      context: ./cmd
-      dockerfile: Dockerfile_dev
+      context: ./go
+      dockerfile: deployments/Dockerfile_dev
     command: >
       /bin/sh -c "
-      go build -gcflags='all=-N -l' -o ./api/main ./api/main.go
-      && dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./api/main"
+      go build -gcflags='all=-N -l' -o ./cmd/apeman/main ./cmd/apeman/main.go
+      && dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./cmd/apeman/main"
 
     volumes:
       - ./go-mod-cache:/go/pkg/mod
-      - ./cmd:/src
+      - ./go:/src
     image: apeman-backend-dev
     ports:
       - "2345:2345"

@@ -1,4 +1,4 @@
-module github.com/hotnops/apeman/src
+module github.com/hotnops/apeman/go
 
 go 1.20
 
