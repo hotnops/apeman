@@ -18,8 +18,6 @@ package config
 
 import (
 	"fmt"
-
-	"github.com/hotnops/apeman/src/serde"
 )
 
 // NewDefaultConfiguration returns a new Configuration struct containing all documented
@@ -39,7 +37,7 @@ func NewDefaultConfiguration() (Configuration, error) {
 			MaxGraphQueryCacheSize: 100, // Number of cache items for graph queries
 			MaxAPICacheSize:        200, // Number of cache items for API utilities
 			MetricsPort:            ":2112",
-			RootURL:                serde.MustParseURL("http://localhost"),
+			RootURL:                "http://localhost",
 			WorkDir:                "/opt/bhe/work",
 			LogLevel:               "INFO",
 			LogPath:                DefaultLogFilePath,

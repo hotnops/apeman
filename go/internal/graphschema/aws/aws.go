@@ -79,4 +79,9 @@ type IdentityTrasformType string
 
 const (
 	IdentityTransformAssumeRole IdentityTrasformType = "sts:assumerole"
+<<<<<<< HEAD:cmd/packages/go/graphschema/aws/aws.go
+=======
+	IdentityTransformUpdateAssumeRolePolicy IdentityTrasformType = "iam:updateassumerolepolicy"
+	IdentityTransformCreateAccessKey IdentityTrasformType = "iam:createaccesskey"
+>>>>>>> main:go/internal/graphschema/aws/aws.go
 )

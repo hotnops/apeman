@@ -1,0 +1,51 @@
+name: Build check
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  ts-compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./ui/apeman-ui
+
+      - name: Run TypeScript compiler with noEmit
+        run: npx tsc --noEmit --strict
+        working-directory: ./ui/apeman-ui
+
+  go-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.20" # Replace with the Go version you want to use
+
+      - name: Download Go modules
+        run: go mod download
+        working-directory: ./go
+
+      - name: Build Go binary
+        run: go build -ldflags '-s -w' -o main ./cmd/apeman/main.go
+        working-directory: ./go
+
+      - name: Check if Go binary exists
+        run: test -f ./main
+        working-directory: ./go

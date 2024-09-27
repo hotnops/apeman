@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hotnops/apeman/src/serde"
 	"github.com/specterops/bloodhound/log"
 )
 
@@ -224,13 +223,6 @@ func setRawValue(targetAddr any, value string) error {
 
 	case *time.Duration:
 		if parsed, err := time.ParseDuration(value); err != nil {
-			return err
-		} else {
-			*casted = parsed
-		}
-
-	case *serde.URL:
-		if parsed, err := serde.ParseURL(value); err != nil {
 			return err
 		} else {
 			*casted = parsed

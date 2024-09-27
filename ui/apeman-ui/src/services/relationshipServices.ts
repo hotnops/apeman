@@ -28,7 +28,7 @@ export function relationshipToGraphEdge(relationship: Relationship): GraphEdge {
     id: relationship.ID.toString(),
     source: relationship.StartID.toString(),
     target: relationship.EndID.toString(),
-    label: relationship.Kind,
+    label: relationship.Kind === "IdentityTransform" ? relationship.Properties.map.name : relationship.Kind,
     size: size,
   };
 }

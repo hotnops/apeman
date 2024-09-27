@@ -1,0 +1,42 @@
+name: Build and Push Docker Image
+
+on:
+  pull_request:
+    types:
+      - closed # Triggers when a pull request is closed (which includes merging)
+  workflow_dispatch:
+
+jobs:
+  docker-publish:
+    if: (github.event.pull_request.merged == true && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PAT }}
+
+      - name: Build and push apeman-frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ui/apeman-ui
+          file: ./ui/apeman-ui/Dockerfile
+          push: true
+          tags: ${{ github.repository_owner }}/apeman-frontend:latest
+
+      - name: Build and push apeman-backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./go
+          no-cache: true
+          file: ./go/deployments/Dockerfile
+          push: true
+          tags: ${{ github.repository_owner }}/apeman-backend:latest
