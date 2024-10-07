@@ -9,5 +9,3 @@ node_modules/
 gaad/
 go-mod-cache/
 go/cmd/apeman/main
-go/go.work
-go/go.work.sum
