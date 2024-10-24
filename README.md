@@ -44,7 +44,7 @@ sudo apt install python3-venv
 ```
 git clone git@github.com:hotnops/apeman.git
 cd apeman
-mkdir import // THIS IS REALLY IMPORTANT
+mkdir import # THIS IS REALLY IMPORTANT
 sudo docker compose -f compose.yaml up
 ```
 
@@ -64,7 +64,7 @@ pip install -r requirements.txt
 The first time that you start apeman, the AWS nodes and relationships need to be added to the graph. This includes all services, actions, resource types, and condition keys. THIS ONLY NEEDS TO BE RUN ONCE! If AWS updates a service or adds an action, then you will need to re-run this command to honor the new changes. To do this, run the following command:
 
 ```
-// From apeman/utils
+# From apeman/utils
 python -m init.aws_initialize -o ../import
 ```
 
@@ -85,7 +85,7 @@ Data needs to be ingested and analyzed before Apeman can present useful informat
 called "gaad"
 
 ```
-// cd back to the root apeman dir
+# cd back to the root apeman dir
 cd ../
 mkdir gaad
 touch gaad/arns.csv
