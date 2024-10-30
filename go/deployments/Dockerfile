@@ -1,6 +1,6 @@
 FROM golang:1.20-alpine AS builder
 WORKDIR /src
-COPY go.mod go.sum go.work ./
+COPY go.mod go.sum ./
 COPY . .
 RUN go mod download
 RUN go build -ldflags '-s -w' -o /app ./cmd/apeman/main.go
